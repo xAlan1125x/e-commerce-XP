@@ -54,8 +54,8 @@ Como cliente registrado quiero consultar únicamente mis pedidos.
 ### Historias técnicas
 
 - La autenticación futura debe soportar TOTP de 6 dígitos o WebAuthn/Passkeys y responder 401 sin la segunda validación.
-- Las contraseñas deben usar bcrypt/Argon2 con salting (coste mínimo 12); los secretos sensibles deben cifrarse con AES-256-GCM.
-- Las compras y actualizaciones de inventario deben ser atómicas y evitar overselling; una contienda por el último stock debe devolver HTTP 409.
+- Las contraseñas se procesan con bcrypt y factor de coste 12; los secretos sensibles se cifran con AES-256-GCM usando `ENCRYPTION_KEY`.
+- Las compras validan todos los ítems antes de modificar el inventario; una compra sin stock suficiente devuelve HTTP 409 y no aplica descuentos parciales.
 
 ## Fases BDD y XP
 
@@ -86,7 +86,7 @@ El ciclo aplicado es **Red → Green → Refactor**: primero se expresa el compo
 │   ├── controllers/                 # Traducción HTTP -> casos de uso
 │   ├── services/                    # Reglas de negocio
 │   ├── repositories/                # Persistencia (en memoria para esta entrega)
-│   └── middlewares/                 # Punto de extensión para errores/seguridad
+│   └── security/                    # bcrypt, TOTP, AES-256-GCM y tokens
 ├── tests/step_definitions/           # Adaptadores Cucumber que ejercitan app real
 ├── prisma/schema.prisma              # Modelo persistente preparado para Prisma
 ├── cucumber.js                       # Configuración ts-node + features
@@ -104,6 +104,8 @@ La persistencia en memoria mantiene la solución simple y reproducible para BDD.
 - `POST /api/pedidos` crea un pedido.
 - `PATCH /api/pedidos/:id/cancelar` cancela un pedido pendiente.
 - `GET /api/clientes/:clienteId/pedidos` consulta el historial del cliente.
+- `POST /api/auth/register` registra credenciales con bcrypt.
+- `POST /api/auth/login` exige contraseña y, si está activado, código TOTP de seis dígitos.
 - `GET /` sirve el frontend.
 
 ## Cómo levantar el proyecto
@@ -112,8 +114,12 @@ Requisitos: Node.js 20 o superior.
 
 ```bash
 npm install
+copy .env.example .env
 npm run dev
 ```
+
+Edita `.env` con secretos locales propios. En PowerShell también puedes usar
+`$env:ENCRYPTION_KEY = "una-clave-local-segura"` antes de arrancar.
 
 Abrir `http://localhost:3000` para usar el frontend.
 
@@ -129,4 +135,10 @@ Para comprobar tipos:
 npx tsc --noEmit
 ```
 
-El pipeline de GitHub Actions ejecuta `npm ci`, lint si está disponible, compilación TypeScript y la suite Cucumber en cada push y pull request.
+Para ejecutar el linter:
+
+```bash
+npm run lint
+```
+
+El pipeline de GitHub Actions ejecuta `npm ci`, lint, compilación TypeScript y la suite Cucumber en cada push y pull request.

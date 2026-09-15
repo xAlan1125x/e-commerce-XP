@@ -4,8 +4,13 @@ import { PedidosService } from '../services/pedidos.service';
 const service = new PedidosService();
 
 export const crearPedidoHandler = (req: Request, res: Response) => {
-  const { clienteId, cantidad, producto } = req.body;
-  const result = service.crear(clienteId, cantidad, producto);
+  const { clienteId, cantidad, producto, items } = req.body;
+  const pedidoItems = Array.isArray(items) ? items.map((item: { producto: string; cantidad: number; precioUnitario?: number }) => ({
+    producto: item.producto,
+    cantidad: item.cantidad,
+    precioUnitario: item.precioUnitario ?? 1
+  })) : [{ producto, cantidad, precioUnitario: 1 }];
+  const result = service.crearConItems(clienteId, pedidoItems);
 
   if ('error' in result) {
     return res.status(result.status).json({ error: result.error });
@@ -17,7 +22,10 @@ export const crearPedidoHandler = (req: Request, res: Response) => {
     clienteId: result.pedido.clienteId,
     producto: result.pedido.producto,
     estado: result.pedido.estado,
-    stockRestante: result.stockRestante
+    stockRestante: result.stockRestante,
+    items: result.pedido.items,
+    total: result.pedido.total,
+    createdAt: result.pedido.createdAt
   });
 };
 

@@ -1,9 +1,18 @@
 export interface Pedido {
   id: number;
   clienteId: string;
+  producto?: string;
+  cantidad?: number;
+  items: PedidoItem[];
+  estado: string;
+  createdAt: string;
+  total: number;
+}
+
+export interface PedidoItem {
   producto: string;
   cantidad: number;
-  estado: string;
+  precioUnitario: number;
 }
 
 export class PedidosRepository {
@@ -24,8 +33,8 @@ export class PedidosRepository {
 
   reset(): void {
     this.pedidos = [
-      { id: 501, clienteId: 'cli_1', producto: 'Procesador Intel', cantidad: 2, estado: 'Pendiente' },
-      { id: 502, clienteId: 'cli_2', producto: 'Procesador Intel', cantidad: 1, estado: 'Enviado' }
+      { id: 501, clienteId: 'cli_1', producto: 'Procesador Intel', cantidad: 2, items: [{ producto: 'Procesador Intel', cantidad: 2, precioUnitario: 1 }], estado: 'Pendiente', createdAt: new Date().toISOString(), total: 2 },
+      { id: 502, clienteId: 'cli_2', producto: 'Procesador Intel', cantidad: 1, items: [{ producto: 'Procesador Intel', cantidad: 1, precioUnitario: 1 }], estado: 'Enviado', createdAt: new Date().toISOString(), total: 1 }
     ];
     this.stockMap.set('Procesador Intel', 10);
   }
@@ -38,22 +47,26 @@ export class PedidosRepository {
     this.stockMap.set(producto, nuevoStock);
   }
 
-  crearPedido(clienteId: string, cantidad: number, producto: string): Pedido | null {
-    const stockActual = this.obtenerStock(producto);
-    if (stockActual < cantidad) return null;
-
-    const nuevoStock = stockActual - cantidad;
-    this.actualizarStock(producto, nuevoStock);
-
+  crearPedido(clienteId: string, items: PedidoItem[]): { pedido: Pedido; stockRestante: number } | null {
+    const cantidades = new Map<string, number>();
+    for (const item of items) cantidades.set(item.producto, (cantidades.get(item.producto) ?? 0) + item.cantidad);
+    for (const [producto, cantidad] of cantidades) {
+      if (this.obtenerStock(producto) < cantidad) return null;
+    }
+    for (const [producto, cantidad] of cantidades) this.actualizarStock(producto, this.obtenerStock(producto) - cantidad);
+    const first = items[0];
     const nuevoPedido: Pedido = {
-      id: this.pedidos.length + 1,
+      id: this.pedidos.reduce((max, pedido) => Math.max(max, pedido.id), 0) + 1,
       clienteId,
-      producto,
-      cantidad,
-      estado: 'Pendiente de Envío'
+      producto: first.producto,
+      cantidad: first.cantidad,
+      items,
+      estado: 'Pendiente de Envío',
+      createdAt: new Date().toISOString(),
+      total: items.reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0)
     };
     this.pedidos.push(nuevoPedido);
-    return nuevoPedido;
+    return { pedido: nuevoPedido, stockRestante: this.obtenerStock(first.producto) };
   }
 
   cancelarPedido(id: number): { pedido: Pedido; stockRestante: number } | null {
@@ -61,10 +74,9 @@ export class PedidosRepository {
     if (!pedido || pedido.estado === 'Enviado' || pedido.estado === 'Entregado') return null;
 
     pedido.estado = 'Cancelado';
-    const nuevoStock = this.obtenerStock(pedido.producto) + pedido.cantidad;
-    this.actualizarStock(pedido.producto, nuevoStock);
+    for (const item of pedido.items) this.actualizarStock(item.producto, this.obtenerStock(item.producto) + item.cantidad);
 
-    return { pedido, stockRestante: nuevoStock };
+    return { pedido, stockRestante: this.obtenerStock(pedido.items[0].producto) };
   }
 
   listarPorCliente(clienteId: string): Pedido[] {
@@ -81,7 +93,10 @@ export class PedidosRepository {
       clienteId,
       producto: 'Pedido de prueba',
       cantidad: 1,
-      estado
+      items: [{ producto: 'Pedido de prueba', cantidad: 1, precioUnitario: 15000 }],
+      estado,
+      createdAt: new Date().toISOString(),
+      total: 15000
     };
     this.pedidos.push(pedido);
     return pedido;
