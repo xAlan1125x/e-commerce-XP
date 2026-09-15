@@ -1,0 +1,44 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+
+model Producto {
+  id          Int            @id @default(autoincrement())
+  nombre      String         @unique
+  precio      Float
+  stock       Int
+  categoria   String
+  detalles    DetallePedido[]
+  createdAt   DateTime       @default(now())
+
+  @@map("productos")
+}
+
+model Pedido {
+  id          Int            @id @default(autoincrement())
+  clienteId   String
+  estado      String         @default("Pendiente de Envío") // "Pendiente de Envío", "En camino", "Entregado", "Cancelado"
+  codigoEnvio String?
+  detalles    DetallePedido[]
+  createdAt   DateTime       @default(now())
+
+  @@map("pedidos")
+}
+
+model DetallePedido {
+  id         Int      @id @default(autoincrement())
+  pedidoId   Int
+  productoId Int
+  cantidad   Int
+  precioUnit Float
+  pedido     Pedido   @relation(fields: [pedidoId], references: [id])
+  producto   Producto @relation(fields: [productoId], references: [id])
+
+  @@map("detalles_pedido")
+}

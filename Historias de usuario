@@ -1,0 +1,67 @@
+E-commerce
+
+Historias de Usuario
+1- Creación de Productos en el Catálogo.
+Como administrador de la tienda quiero registrar un nuevo producto con su nombre, precio, stock y categoría para ponerlo a la venta en el catálogo.
+Criterios de aceptación:
+    El producto debe guardarse correctamente con un ID único si el nombre no está vacío, el precio es mayor a 0 y el stock es mayor o igual a 0.
+    Si el precio es menor o igual a 0 o faltan campos obligatorios, el sistema debe rechazar la creación con un error HTTP 422 (Unprocessable Content). 
+    No se permite registrar dos productos con el mismo nombre exacto.
+
+2- Consulta del Catálogo de Productos.
+Como cliente, quiero listar los productos disponibles con opción de filtrar por categoría para encontrar los artículos que me interesan.
+Criterios de Aceptación:
+    La consulta debe devolver el listado de productos activos junto con sus detalles (nombre, precio, stock y categoría).
+    Si se especifica un filtro de categoría (ej. ?categoriaId=2), el sistema solo debe devolver los productos pertenecientes a esa categoría.
+    Si no hay productos que coincidan con el filtro, el sistema debe responder con una lista vacía [] y código 200 OK.
+
+3- Actualización de Inventario / Stock.
+Como administrador de la tienda, quiero modificar la cantidad disponible de un producto para mantener el inventario actualizado.
+Criterios de Aceptación:
+    Al enviar un nuevo valor de stock para un producto existente, el campo debe actualizarse en la base de datos.  
+    Si el producto solicitado no existe (ID inválido), el sistema debe responder con un error 404 Not Found.  
+    No se permite ingresar valores de stock negativos.
+
+4- Creación de Pedido / Checkout
+Como cliente registrado, quiero procesar la compra de uno o varios productos para generar un pedido en el sistema.
+Criterios de Aceptación:
+    El pedido debe crearse exitosamente si hay suficiente stock disponible de cada producto solicitado.  
+    Al confirmarse el pedido, el stock de cada producto comprado debe descontarse automáticamente en la cantidad solicitada.  
+    Si la compra involucra múltiples ítems y uno solo no tiene stock suficiente, toda la operación debe cancelarse (rollback) sin modificar el stock de ningún producto.  
+
+5- Cancelación de Pedidos
+Como cliente, quiero poder cancelar un pedido en estado "Pendiente" para liberar los productos reservados.
+Criterios de Aceptación:
+    Al cancelar un pedido en estado "Pendiente", su estado debe cambiar a "Cancelado".
+    El stock de los productos incluidos en el pedido debe reintegrarse al inventario de forma automática.
+    Si el pedido ya fue "Enviado" o "Entregado", el sistema debe rechazar la cancelación indicando que la operación no es válida.
+
+6- Consulta de Historial de Pedidos
+Como cliente registrado, quiero consultar el historial de mis pedidos realizados para realizar el seguimiento de mis compras.
+Criterios de Aceptación:
+    El usuario puede ver únicamente sus propios pedidos solicitando el endpoint del historial.
+    Cada pedido listado debe mostrar la fecha, los productos comprados, las cantidades, el precio unitario y el total calculado.  
+    Si el usuario no tiene pedidos registrados, el sistema debe devolver una colección vacía con código HTTP 200 OK.  
+
+Historias de Usuario Técnicas (Requisitos No Funcionales)
+1- Autenticación Robusta con Múltiple Factor (2FA / WebAuthn)
+Como usuario de la plataforma, quiero autenticarme mediante un segundo factor (TOTP) o credenciales biométricas (WebAuthn/Passkeys) para evitar que terceros no autorizados accedan a mi cuenta o a mis métodos de pago guardados a través de ataques de phishing o scam.
+Criterios de Aceptación:
+    Si el usuario activa 2FA, la API exigirá un código TOTP válido de 6 dígitos antes de entregar un token de sesión de acceso (JWT).
+    El sistema soportará el estándar WebAuthn para registrar y validar credenciales biométricas (como huella dactilar o FaceID) almacenando únicamente las llaves públicas del cliente.
+    Cualquier intento de inicio de sesión con credenciales comprometidas o sin la segunda validación devolverá un código HTTP 401 Unauthorized.
+
+2- Cifrado y Hashing Seguro de Credenciales y Llaves (DB Security)
+Como administrador de base de datos y auditor de seguridad, quiero que las contraseñas se almacenen usando algoritmos de hashing seguros con salting (bcrypt o argon2) y que los datos sensibles (tokens y llaves) se cifren con AES-256-GCM para garantizar que una filtración no exponga la información en texto plano.
+Criterios de Aceptación:
+    Ninguna contraseña se almacenará en texto plano; deben procesarse obligatoriamente con bcrypt (factor de costo mínimo $\ge 12$) antes de persistir en PostgreSQL.  
+    Las llaves secretas, tokens de pago y datos sensibles se guardarán en la base de datos cifrados mediante AES-256-GCM utilizando una clave simétrica gestionada por variables de entorno del servidor.
+    El sistema no proveerá ningún mecanismo ni endpoint para revertir o descifrar el hash de las contraseñas.
+
+3- Transacciones Atómicas y Control de Concurrencia en Inventario
+Como arquitecto del sistema, quiero que el procesamiento de compras y descuento de stock se ejecute dentro de transacciones atómicas de base de datos (ACID) para garantizar la consistencia del inventario ante peticiones concurrentes y evitar ventas sin stock real (overselling).
+Criterios de Aceptación:
+    Las operaciones de creación de pedido y actualización de stock deben ejecutarse dentro de un bloque transaccional (ej. $transaction de Prisma).
+    Si dos peticiones simultáneas intentan comprar el mismo producto y solo queda una unidad en stock, el sistema procesará la primera con éxito y rechazará la segunda con un error HTTP 409 Conflict.
+    Ante cualquier fallo en el proceso de pago o registro (ej. desconexión de base de datos a mitad de la operación), el sistema aplicará un rollback completo cancelando todos los cambios parciales.
+
