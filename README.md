@@ -110,7 +110,7 @@ La persistencia en memoria mantiene la solución simple y reproducible para BDD.
 
 ## Cómo levantar el proyecto
 
-Requisitos: Node.js 20 o superior.
+Requisitos: Node.js 22 o superior.
 
 ```bash
 npm install
