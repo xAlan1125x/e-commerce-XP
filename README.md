@@ -8,12 +8,11 @@ Plataforma backend de comercio electrónico implementada con TypeScript, Express
 
 Desde `http://localhost:3000` se puede:
 
-- Consultar el catálogo de productos.
-- Filtrar productos por categoría.
-- Crear productos indicando nombre, precio, stock y categoría.
-- Crear pedidos indicando cliente, producto y cantidad.
-- Ver el stock restante después de confirmar un pedido.
-- Actualizar el catálogo mediante el botón de recarga.
+- Cambiar entre las vistas de desarrollo **Comprador** y **Vendedor**.
+- Como comprador, consultar el catálogo, filtrar por categoría, crear un carrito multiítem, confirmar pedidos y consultar/cancelar el historial.
+- Como vendedor, crear productos, actualizar stock, consultar todos los pedidos y ver sus estados, clientes, fechas y totales.
+- Ver mensajes de procesamiento, éxito y error que se limpian y vuelven a mostrar en cada acción.
+- Ver el stock actualizado después de cada operación.
 
 ### Funcionalidades disponibles mediante la API
 
@@ -183,6 +182,7 @@ Los productos y su stock se almacenan mediante Prisma en SQLite. Los pedidos man
 - `GET /api/productos?categoria=Audio` lista y filtra productos.
 - `PATCH /api/productos/:id/stock` actualiza stock.
 - `POST /api/pedidos` crea un pedido.
+- `GET /api/pedidos` lista los pedidos disponibles para la vista del vendedor.
 - `PATCH /api/pedidos/:id/cancelar` cancela un pedido pendiente.
 - `GET /api/clientes/:clienteId/pedidos` consulta el historial del cliente.
 - `POST /api/auth/register` registra credenciales con bcrypt.
@@ -202,6 +202,10 @@ npm run dev
 
 Edita `.env` con secretos locales propios. En PowerShell también puedes usar
 `$env:ENCRYPTION_KEY = "una-clave-local-segura"` antes de arrancar.
+
+Si el servidor ya estaba ejecutándose, detenlo y vuelve a ejecutar `npm run dev`
+después de actualizar el código. De lo contrario, el navegador puede seguir
+conectado a un proceso anterior que no tenga las rutas más recientes.
 
 Abrir `http://localhost:3000` para usar el frontend.
 

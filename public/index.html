@@ -10,57 +10,70 @@
     <header class="hero">
       <div class="container">
         <p class="eyebrow">Backend + BDD + XP</p>
-        <h1>Catálogo E-Commerce</h1>
-        <p class="subtitle">Administra productos, stock y pedidos desde una interfaz simple.</p>
+        <h1>Catalogo E-Commerce</h1>
+        <p class="subtitle">Gestiona productos, pedidos y compras desde una sola interfaz.</p>
       </div>
     </header>
 
-    <main class="container layout">
-      <section class="panel">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Catálogo</p>
-            <h2>Productos disponibles</h2>
+    <main class="container app">
+      <div id="notice" class="notice" role="status" aria-live="polite"></div>
+      <nav class="tabs" aria-label="Tipo de usuario">
+        <button class="tab active" type="button" data-tab="buyer">Comprador</button>
+        <button class="tab" type="button" data-tab="seller">Vendedor</button>
+      </nav>
+
+      <section id="buyer-tab" class="tab-panel active">
+        <div class="panel">
+          <div class="section-heading">
+            <div><p class="eyebrow">Catalogo</p><h2>Productos disponibles</h2></div>
+            <button id="refresh-products" class="button secondary" type="button">Actualizar</button>
           </div>
-          <button id="refresh-products" class="button secondary" type="button">Actualizar</button>
+          <form id="filter-form" class="inline-form">
+            <label>Categoria<input id="category-filter" name="categoria" placeholder="Ej. Audio"></label>
+            <button class="button" type="submit">Filtrar</button>
+          </form>
+          <div id="product-list" class="product-grid" aria-live="polite"></div>
         </div>
-        <form id="filter-form" class="inline-form">
-          <label>
-            Categoría
-            <input id="category-filter" name="categoria" placeholder="Ej. Audio">
-          </label>
-          <button class="button" type="submit">Filtrar</button>
-        </form>
-        <div id="product-list" class="product-grid" aria-live="polite"></div>
+        <div class="buyer-grid">
+          <section class="panel">
+            <div class="section-heading"><div><p class="eyebrow">Compra</p><h2>Carrito</h2></div></div>
+            <div id="cart-list"><p class="empty">El carrito esta vacio.</p></div>
+            <form id="order-form" class="stack-form">
+              <label>Cliente<input name="clienteId" value="cliente_web" required></label>
+              <button class="button" type="submit">Confirmar compra</button>
+            </form>
+            <div id="order-result" class="notice" role="status"></div>
+          </section>
+          <section class="panel">
+            <div class="section-heading"><div><p class="eyebrow">Seguimiento</p><h2>Mis pedidos</h2></div></div>
+            <form id="history-form" class="inline-form">
+              <label>Cliente<input id="history-client" value="cliente_web" required></label>
+              <button class="button secondary" type="submit">Consultar</button>
+            </form>
+            <div id="history-list"><p class="empty">Indica un cliente para consultar.</p></div>
+          </section>
+        </div>
       </section>
 
-      <aside class="panel">
-        <p class="eyebrow">Administración</p>
-        <h2>Nuevo producto</h2>
-        <form id="product-form" class="stack-form">
-          <label>Nombre<input name="nombre" required></label>
-          <label>Precio<input name="precio" type="number" min="0.01" step="0.01" required></label>
-          <label>Stock<input name="stock" type="number" min="0" step="1" required></label>
-          <label>Categoría<input name="categoria" required></label>
-          <button class="button" type="submit">Crear producto</button>
-        </form>
-        <p id="notice" class="notice" role="status"></p>
-      </aside>
-
-      <section class="panel orders-panel">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Checkout</p>
-            <h2>Crear pedido</h2>
-          </div>
+      <section id="seller-tab" class="tab-panel">
+        <div class="seller-grid">
+          <section class="panel">
+            <p class="eyebrow">Administracion</p><h2>Nuevo producto</h2>
+            <form id="product-form" class="stack-form">
+              <label>Nombre<input name="nombre" required></label>
+              <label>Precio<input name="precio" type="number" min="0.01" step="0.01" required></label>
+              <label>Stock<input name="stock" type="number" min="0" step="1" required></label>
+              <label>Categoria<input name="categoria" required></label>
+              <button class="button" type="submit">Crear producto</button>
+            </form>
+            <div class="stock-box"><p class="eyebrow">Inventario</p><h2>Actualizar stock</h2><div id="stock-list"></div></div>
+          </section>
+          <section class="panel">
+            <div class="section-heading"><div><p class="eyebrow">Operaciones</p><h2>Pedidos recibidos</h2></div>
+              <button id="refresh-orders" class="button secondary" type="button">Actualizar</button></div>
+            <div id="seller-orders"><p class="empty">Cargando pedidos...</p></div>
+          </section>
         </div>
-        <form id="order-form" class="order-form">
-          <label>Cliente<input name="clienteId" value="cliente_web" required></label>
-          <label>Producto<select id="order-product" name="producto" required></select></label>
-          <label>Cantidad<input name="cantidad" type="number" min="1" step="1" value="1" required></label>
-          <button class="button" type="submit">Confirmar pedido</button>
-        </form>
-        <div id="order-result" class="notice" role="status"></div>
       </section>
     </main>
     <script src="/app.js" defer></script>

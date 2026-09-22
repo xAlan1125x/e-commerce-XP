@@ -40,4 +40,8 @@ export class PedidosService {
   historial(clienteId: string): Pedido[] {
     return this.repo.listarPorCliente(clienteId);
   }
+
+  todos(): Pedido[] {
+    return this.repo.listarTodos();
+  }
 }

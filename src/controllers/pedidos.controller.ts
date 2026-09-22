@@ -47,3 +47,7 @@ export const cancelarPedidoHandler = async (req: Request, res: Response) => {
 export const historialPedidosHandler = (req: Request, res: Response) => {
   return res.status(200).json(service.historial(String(req.params.clienteId)));
 };
+
+export const listarPedidosHandler = (_req: Request, res: Response) => {
+  return res.status(200).json(service.todos());
+};

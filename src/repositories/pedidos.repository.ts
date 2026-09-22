@@ -103,6 +103,10 @@ export class PedidosRepository {
     return this.pedidos.filter(pedido => pedido.clienteId === clienteId);
   }
 
+  listarTodos(): Pedido[] {
+    return [...this.pedidos].sort((a, b) => b.id - a.id);
+  }
+
   eliminarPorCliente(clienteId: string): void {
     this.pedidos = this.pedidos.filter(pedido => pedido.clienteId !== clienteId);
   }
