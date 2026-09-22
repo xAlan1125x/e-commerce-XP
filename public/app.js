@@ -38,13 +38,14 @@ document.querySelector('#filter-form').addEventListener('submit', (event) => { e
 document.querySelector('#refresh-products').addEventListener('click', loadProducts);
 document.querySelector('#product-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const data = Object.fromEntries(new FormData(event.currentTarget));
+  const form = event.currentTarget;
+  const data = Object.fromEntries(new FormData(form));
   data.precio = Number(data.precio);
   data.stock = Number(data.stock);
   try {
     await api('/api/productos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
     notice.textContent = 'Producto creado correctamente.';
-    event.currentTarget.reset();
+    form.reset();
     await loadProducts();
   } catch (error) { notice.textContent = error.message; }
 });

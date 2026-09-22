@@ -7,8 +7,8 @@ import { PedidosRepository } from '../../src/repositories/pedidos.repository';
 const repo = PedidosRepository.getInstance();
 
 // HU04 - Creación de Pedido
-Given('que el producto {string} tiene un stock disponible de {int} unidades', function (nombre: string, stock: number) {
-  repo.actualizarStock(nombre, stock);
+Given('que el producto {string} tiene un stock disponible de {int} unidades', async function (nombre: string, stock: number) {
+  await repo.actualizarStock(nombre, stock);
 });
 
 When('el cliente {string} realiza un pedido de {int} unidades de {string}', async function (clienteId: string, cantidad: number, nombreProducto: string) {
@@ -44,8 +44,8 @@ Then('el stock de {string} debe permanecer intacto en {int} unidades', function 
 });
 
 // HU05 - Cancelación de Pedidos
-Given('que el cliente {string} tiene un pedido registrado con ID {int} en estado {string} que incluye {int} unidades de {string}', function (cliente: string, id: number, estado: string, cantidad: number, producto: string) {
-  repo.actualizarStock(producto, 10);
+Given('que el cliente {string} tiene un pedido registrado con ID {int} en estado {string} que incluye {int} unidades de {string}', async function (cliente: string, id: number, estado: string, cantidad: number, producto: string) {
+  await repo.actualizarStock(producto, 10);
   const repoAny = repo as any;
   const pedidoExistente = repoAny.pedidos?.find((p: any) => p.id === id);
   if (pedidoExistente) {
@@ -55,8 +55,8 @@ Given('que el cliente {string} tiene un pedido registrado con ID {int} en estado
   }
 });
 
-Given('el stock actual de {string} es de {int} unidades', function (producto: string, stock: number) {
-  repo.actualizarStock(producto, stock);
+Given('el stock actual de {string} es de {int} unidades', async function (producto: string, stock: number) {
+  await repo.actualizarStock(producto, stock);
 });
 
 When('el cliente solicita cancelar el pedido con ID {int}', async function (id: number) {

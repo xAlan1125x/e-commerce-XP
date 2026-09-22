@@ -17,6 +17,7 @@ export interface PedidoItem {
 
 export class PedidosRepository {
   private static instance: PedidosRepository;
+  private readonly prisma = new PrismaClient();
   private pedidos: Pedido[] = [];
   private stockMap: Map<string, number> = new Map();
 
@@ -39,21 +40,33 @@ export class PedidosRepository {
     this.stockMap.set('Procesador Intel', 10);
   }
 
-  obtenerStock(producto: string): number {
-    return this.stockMap.get(producto) ?? 0;
+  async obtenerStock(producto: string): Promise<number> {
+    const registro = await this.prisma.producto.findUnique({ where: { nombre: producto }, select: { stock: true } });
+    return registro?.stock ?? 0;
   }
 
-  actualizarStock(producto: string, nuevoStock: number): void {
-    this.stockMap.set(producto, nuevoStock);
+  async actualizarStock(producto: string, nuevoStock: number): Promise<void> {
+    await this.prisma.producto.upsert({
+      where: { nombre: producto },
+      update: { stock: nuevoStock },
+      create: { nombre: producto, precio: 1, stock: nuevoStock, categoria: 'Pruebas' }
+    });
   }
 
-  crearPedido(clienteId: string, items: PedidoItem[]): { pedido: Pedido; stockRestante: number } | null {
+  async crearPedido(clienteId: string, items: PedidoItem[]): Promise<{ pedido: Pedido; stockRestante: number } | null> {
     const cantidades = new Map<string, number>();
     for (const item of items) cantidades.set(item.producto, (cantidades.get(item.producto) ?? 0) + item.cantidad);
-    for (const [producto, cantidad] of cantidades) {
-      if (this.obtenerStock(producto) < cantidad) return null;
-    }
-    for (const [producto, cantidad] of cantidades) this.actualizarStock(producto, this.obtenerStock(producto) - cantidad);
+    const actualizado = await this.prisma.$transaction(async (tx) => {
+      for (const [producto, cantidad] of cantidades) {
+        const result = await tx.producto.updateMany({
+          where: { nombre: producto, stock: { gte: cantidad } },
+          data: { stock: { decrement: cantidad } }
+        });
+        if (result.count !== 1) return false;
+      }
+      return true;
+    });
+    if (!actualizado) return null;
     const first = items[0];
     const nuevoPedido: Pedido = {
       id: this.pedidos.reduce((max, pedido) => Math.max(max, pedido.id), 0) + 1,
@@ -66,17 +79,24 @@ export class PedidosRepository {
       total: items.reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0)
     };
     this.pedidos.push(nuevoPedido);
-    return { pedido: nuevoPedido, stockRestante: this.obtenerStock(first.producto) };
+    return { pedido: nuevoPedido, stockRestante: await this.obtenerStock(first.producto) };
   }
 
-  cancelarPedido(id: number): { pedido: Pedido; stockRestante: number } | null {
+  async cancelarPedido(id: number): Promise<{ pedido: Pedido; stockRestante: number } | null> {
     const pedido = this.pedidos.find(p => p.id === id);
     if (!pedido || pedido.estado === 'Enviado' || pedido.estado === 'Entregado') return null;
 
     pedido.estado = 'Cancelado';
-    for (const item of pedido.items) this.actualizarStock(item.producto, this.obtenerStock(item.producto) + item.cantidad);
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of pedido.items) {
+        await tx.producto.updateMany({
+          where: { nombre: item.producto },
+          data: { stock: { increment: item.cantidad } }
+        });
+      }
+    });
 
-    return { pedido, stockRestante: this.obtenerStock(pedido.items[0].producto) };
+    return { pedido, stockRestante: await this.obtenerStock(pedido.items[0].producto) };
   }
 
   listarPorCliente(clienteId: string): Pedido[] {
@@ -102,3 +122,4 @@ export class PedidosRepository {
     return pedido;
   }
 }
+import { PrismaClient } from '@prisma/client';

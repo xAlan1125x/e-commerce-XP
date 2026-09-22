@@ -29,5 +29,8 @@ jobs:
       - name: Compilación de TypeScript
         run: npx tsc --noEmit
 
+      - name: Preparar base de datos de pruebas
+        run: npx prisma db push --skip-generate
+
       - name: Ejecución de Pruebas BDD (Cucumber)
         run: npm run test:e2e
