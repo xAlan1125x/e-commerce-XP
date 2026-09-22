@@ -39,4 +39,16 @@ export class ProductosService {
       ? { producto, status: 200 }
       : { error: 'Producto no encontrado', status: 404 };
   }
+
+  async eliminar(id: number): Promise<{ status: number; error?: string }> {
+    try {
+      const producto = await this.repo.eliminar(id);
+      return producto ? { status: 204 } : { status: 404, error: 'Producto no encontrado' };
+    } catch (error) {
+      if ((error as { code?: string }).code === 'P2003') {
+        return { status: 409, error: 'No se puede eliminar un producto incluido en pedidos' };
+      }
+      throw error;
+    }
+  }
 }

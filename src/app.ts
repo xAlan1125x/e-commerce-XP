@@ -2,7 +2,7 @@ import express from 'express';
 import 'dotenv/config';
 import path from 'path';
 import { crearPedidoHandler, cancelarPedidoHandler, listarPedidosHandler } from './controllers/pedidos.controller';
-import { crearProductoHandler, listarProductosHandler, actualizarStockHandler } from './controllers/productos.controller';
+import { crearProductoHandler, listarProductosHandler, actualizarStockHandler, eliminarProductoHandler } from './controllers/productos.controller';
 import { historialPedidosHandler } from './controllers/pedidos.controller';
 import { loginHandler, registerHandler } from './controllers/auth.controller';
 
@@ -20,6 +20,7 @@ app.post('/api/auth/login', loginHandler);
 app.post('/api/productos', crearProductoHandler);
 app.get('/api/productos', listarProductosHandler);
 app.patch('/api/productos/:id/stock', actualizarStockHandler);
+app.delete('/api/productos/:id', eliminarProductoHandler);
 
 if (require.main === module) {
   const port = Number(process.env.PORT ?? 3000);

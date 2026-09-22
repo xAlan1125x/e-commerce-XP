@@ -47,14 +47,15 @@ function renderProducts(products) {
     </article>`).join('') : '<p class="empty">No hay productos para mostrar.</p>';
   stockList.innerHTML = products.length ? products.map((p) => `<form class="stock-row" data-id="${p.id}">
     <span>${escapeHtml(p.nombre)}</span><input name="stock" type="number" min="0" step="1" value="${p.stock}" required>
-    <button class="button secondary" type="submit">Guardar</button></form>`).join('') : '<p class="empty">No hay productos.</p>';
+    <button class="button secondary" type="submit">Guardar</button>
+    <button class="button danger delete-product" data-id="${p.id}" type="button">Eliminar</button></form>`).join('') : '<p class="empty">No hay productos.</p>';
 }
 
 async function loadProducts() {
   const category = $('#category-filter').value.trim();
   const query = category ? `?categoria=${encodeURIComponent(category)}` : '';
-  try { renderProducts(await api(`/api/productos${query}`)); }
-  catch (error) { productList.innerHTML = `<p class="empty">${escapeHtml(error.message)}</p>`; feedback($('#notice'), error.message, 'error'); }
+  try { renderProducts(await api(`/api/productos${query}`)); return true; }
+  catch (error) { productList.innerHTML = `<p class="empty">${escapeHtml(error.message)}</p>`; feedback($('#notice'), error.message, 'error'); return false; }
 }
 
 async function loadSellerOrders() {
@@ -66,7 +67,8 @@ async function loadSellerOrders() {
       <p class="meta">${(order.items || [{ producto: order.producto, cantidad: order.cantidad }]).map((i) => `${escapeHtml(i.producto)} x${i.cantidad}`).join(', ')}</p></div>
       <small>${new Date(order.createdAt).toLocaleString('es-AR')}</small>
     </article>`).join('') : '<p class="empty">No hay pedidos.</p>';
-  } catch (error) { target.innerHTML = `<p class="empty">${escapeHtml(error.message)}</p>`; }
+  } catch (error) { target.innerHTML = `<p class="empty">${escapeHtml(error.message)}</p>`; return false; }
+  return true;
 }
 
 async function loadHistory(clienteId) {
@@ -90,7 +92,13 @@ $('#filter-form').addEventListener('submit', (e) => {
   e.preventDefault(); const button = e.currentTarget.querySelector('button'); busy(button, true);
   loadProducts().finally(() => busy(button, false));
 });
-$('#refresh-products').addEventListener('click', (e) => { busy(e.currentTarget, true); loadProducts().finally(() => busy(e.currentTarget, false)); });
+$('#refresh-products').addEventListener('click', async (e) => {
+  const button = e.currentTarget;
+  busy(button, true);
+  const loaded = await loadProducts();
+  feedback($('#notice'), loaded ? 'Productos actualizados correctamente.' : 'No se pudieron actualizar los productos.', loaded ? 'success' : 'error');
+  busy(button, false);
+});
 $('#product-list').addEventListener('click', (e) => {
   if (!e.target.classList.contains('add-cart')) return;
   const b = e.target;
@@ -113,6 +121,21 @@ $('#stock-list').addEventListener('submit', async (e) => {
     feedback($('#notice'), 'Stock actualizado correctamente.'); await loadProducts();
   } catch (error) { feedback($('#notice'), error.message, 'error'); } finally { busy(button, false); }
 });
+$('#stock-list').addEventListener('click', async (e) => {
+  if (!e.target.classList.contains('delete-product')) return;
+  const button = e.target;
+  if (!window.confirm('¿Eliminar este producto del catálogo?')) return;
+  busy(button, true);
+  try {
+    await api(`/api/productos/${button.dataset.id}`, { method: 'DELETE' });
+    feedback($('#notice'), 'Producto eliminado correctamente.');
+    await loadProducts();
+  } catch (error) {
+    feedback($('#notice'), error.message, 'error');
+  } finally {
+    busy(button, false);
+  }
+});
 $('#order-form').addEventListener('submit', async (e) => {
   e.preventDefault(); const form = e.currentTarget; const button = form.querySelector('button'); const items = [...cart.values()].map(({ producto, cantidad, precioUnitario }) => ({ producto, cantidad, precioUnitario })); if (!items.length) return feedback($('#order-result'), 'Agrega al menos un producto.', 'error');
   busy(button, true); feedback($('#order-result'), ''); const clienteId = new FormData(form).get('clienteId');
@@ -126,5 +149,11 @@ $('#history-list').addEventListener('click', async (e) => {
   if (!e.target.classList.contains('cancel-order')) return; const button = e.target; busy(button, true);
   try { await api(`/api/pedidos/${button.dataset.id}/cancelar`, { method: 'PATCH' }); feedback($('#notice'), 'Pedido cancelado y stock reintegrado.'); await Promise.all([loadHistory($('#history-client').value.trim()), loadProducts()]); } catch (error) { feedback($('#notice'), error.message, 'error'); } finally { busy(button, false); }
 });
-$('#refresh-orders').addEventListener('click', (e) => { busy(e.currentTarget, true); loadSellerOrders().finally(() => busy(e.currentTarget, false)); });
+$('#refresh-orders').addEventListener('click', async (e) => {
+  const button = e.currentTarget;
+  busy(button, true);
+  const loaded = await loadSellerOrders();
+  feedback($('#notice'), loaded ? 'Pedidos actualizados correctamente.' : 'No se pudieron actualizar los pedidos.', loaded ? 'success' : 'error');
+  busy(button, false);
+});
 loadProducts();

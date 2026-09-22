@@ -20,6 +20,13 @@ export class ProductosRepository {
     return prisma.producto.update({ where: { id }, data: { stock } });
   }
 
+  async eliminar(id: number): Promise<Producto | null> {
+    const producto = await prisma.producto.findUnique({ where: { id } });
+    if (!producto) return null;
+    await prisma.producto.delete({ where: { id } });
+    return producto;
+  }
+
   async eliminarPorNombre(nombre: string): Promise<void> {
     await prisma.producto.deleteMany({ where: { nombre } });
   }

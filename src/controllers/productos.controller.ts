@@ -16,3 +16,8 @@ export const actualizarStockHandler = async (req: Request, res: Response) => {
   const result = await service.actualizarStock(Number(req.params.id), req.body?.stock);
   return 'error' in result ? res.status(result.status).json({ error: result.error }) : res.status(result.status).json(result.producto);
 };
+
+export const eliminarProductoHandler = async (req: Request, res: Response) => {
+  const result = await service.eliminar(Number(req.params.id));
+  return result.error ? res.status(result.status).json({ error: result.error }) : res.status(result.status).send();
+};

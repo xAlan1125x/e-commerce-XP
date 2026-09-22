@@ -10,7 +10,7 @@ Desde `http://localhost:3000` se puede:
 
 - Cambiar entre las vistas de desarrollo **Comprador** y **Vendedor**.
 - Como comprador, consultar el catálogo, filtrar por categoría, crear un carrito multiítem, confirmar pedidos y consultar/cancelar el historial.
-- Como vendedor, crear productos, actualizar stock, consultar todos los pedidos y ver sus estados, clientes, fechas y totales.
+- Como vendedor, crear y eliminar productos, actualizar stock, consultar todos los pedidos y ver sus estados, clientes, fechas y totales.
 - Ver mensajes de procesamiento, éxito y error que se limpian y vuelven a mostrar en cada acción.
 - Ver el stock actualizado después de cada operación.
 
@@ -181,6 +181,7 @@ Los productos y su stock se almacenan mediante Prisma en SQLite. Los pedidos man
 - `POST /api/productos` crea un producto.
 - `GET /api/productos?categoria=Audio` lista y filtra productos.
 - `PATCH /api/productos/:id/stock` actualiza stock.
+- `DELETE /api/productos/:id` elimina un producto que todavía no esté incluido en pedidos.
 - `POST /api/pedidos` crea un pedido.
 - `GET /api/pedidos` lista los pedidos disponibles para la vista del vendedor.
 - `PATCH /api/pedidos/:id/cancelar` cancela un pedido pendiente.
