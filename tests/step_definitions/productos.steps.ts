@@ -3,6 +3,7 @@ import request from 'supertest';
 import assert from 'assert';
 import { app } from '../../src/app';
 import { ProductosRepository } from '../../src/repositories/productos.repository';
+import { obtenerTokenAdmin } from '../support/authHelpers';
 
 export let respuestaHTTP: { status: number; body?: any } = { status: 0 };
 let productoGuardado: any = null;
@@ -22,7 +23,8 @@ Given('que no existe un producto llamado {string}', async function (nombre: stri
 });
 
 When('el administrador envía una solicitud para crear el producto {string} con precio {float}, stock {int} y categoría {string}', async function (nombre: string, precio: number, stock: number, categoria: string) {
-  this.response = await request(app).post('/api/productos').send({ nombre, precio, stock, categoria });
+  const token = await obtenerTokenAdmin();
+  this.response = await request(app).post('/api/productos').set('Authorization', `Bearer ${token}`).send({ nombre, precio, stock, categoria });
   respuestaHTTP = { status: this.response.status, body: this.response.body };
   productoGuardado = this.response.body;
 });
@@ -49,9 +51,10 @@ Then('el sistema debe responder con un código HTTP {int} Unprocessable Content'
 });
 
 Given('que existen los siguientes productos en el catálogo:', async function (dataTable) {
+  const token = await obtenerTokenAdmin();
   for (const producto of dataTable.hashes()) {
     await productos.eliminarPorNombre(producto.nombre);
-    await request(app).post('/api/productos').send({
+    await request(app).post('/api/productos').set('Authorization', `Bearer ${token}`).send({
       nombre: producto.nombre,
       precio: Number(producto.precio),
       stock: Number(producto.stock),
@@ -89,7 +92,8 @@ Given('que existe el producto {string} con ID {int} y stock actual de {int} unid
 });
 
 When('el administrador envía una solicitud para actualizar el stock del producto con ID {int} a {int} unidades', async function (id: number, nuevoStock: number) {
-  this.response = await request(app).patch(`/api/productos/${id}/stock`).send({ stock: nuevoStock });
+  const token = await obtenerTokenAdmin();
+  this.response = await request(app).patch(`/api/productos/${id}/stock`).set('Authorization', `Bearer ${token}`).send({ stock: nuevoStock });
   respuestaHTTP = { status: this.response.status, body: this.response.body };
   if (this.response.status < 400) productoGuardado = this.response.body;
 });
@@ -100,7 +104,8 @@ Then('el stock del producto con ID {int} en la base de datos debe ser {int}', fu
 });
 
 When('el administrador intenta actualizar el stock del producto con ID {int} a {int} unidades', async function (id: number, nuevoStock: number) {
-  this.response = await request(app).patch(`/api/productos/${id}/stock`).send({ stock: nuevoStock });
+  const token = await obtenerTokenAdmin();
+  this.response = await request(app).patch(`/api/productos/${id}/stock`).set('Authorization', `Bearer ${token}`).send({ stock: nuevoStock });
   respuestaHTTP = { status: this.response.status, body: this.response.body };
 });
 

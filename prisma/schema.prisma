@@ -42,3 +42,28 @@ model DetallePedido {
 
   @@map("detalles_pedido")
 }
+
+model Usuario {
+  id                Int            @id @default(autoincrement())
+  clienteId         String         @unique
+  email             String         @unique
+  password          String
+  rol               String         @default("CLIENTE") // "CLIENTE" | "ADMIN"
+  twoFactorEnabled  Boolean        @default(true)
+  refreshTokens     RefreshToken[]
+  createdAt         DateTime       @default(now())
+
+  @@map("usuarios")
+}
+
+model RefreshToken {
+  id        Int       @id @default(autoincrement())
+  tokenHash String    @unique
+  usuarioId Int
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id])
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("refresh_tokens")
+}

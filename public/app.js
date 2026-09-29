@@ -4,6 +4,36 @@ const cartList = $('#cart-list');
 const stockList = $('#stock-list');
 const cart = new Map();
 
+let session = null;
+try { session = JSON.parse(localStorage.getItem('session') || 'null'); } catch { session = null; }
+
+function saveSession(nueva) {
+  session = nueva;
+  try { nueva ? localStorage.setItem('session', JSON.stringify(nueva)) : localStorage.removeItem('session'); } catch { /* almacenamiento no disponible */ }
+  updateSessionUI();
+}
+
+function updateSessionUI() {
+  const status = $('#session-status');
+  const logoutButton = $('#logout-button');
+  if (session) {
+    status.textContent = `${session.clienteId} (${session.rol})`;
+    $('#login-form').hidden = true;
+    logoutButton.hidden = false;
+    $('#history-client').value = session.clienteId;
+    $('#order-form [name="clienteId"]').value = session.clienteId;
+  } else {
+    status.textContent = 'Sin sesión';
+    $('#login-form').hidden = false;
+    logoutButton.hidden = true;
+  }
+}
+
+/** Adjunta el access token JWT a las llamadas que requieren autenticación (rutas ADMIN o de propiedad del recurso). */
+function authHeaders() {
+  return session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {};
+}
+
 async function api(url, options) {
   const response = await fetch(url, options);
   const body = await response.json().catch(() => ({}));
@@ -61,7 +91,7 @@ async function loadProducts() {
 async function loadSellerOrders() {
   const target = $('#seller-orders');
   try {
-    const orders = await api('/api/pedidos');
+    const orders = await api('/api/pedidos', { headers: { ...authHeaders() } });
     target.innerHTML = orders.length ? orders.map((order) => `<article class="order-row">
       <div><strong>#${order.id}</strong> ${escapeHtml(order.clienteId)} <span class="status">${escapeHtml(order.estado)}</span>
       <p class="meta">${(order.items || [{ producto: order.producto, cantidad: order.cantidad }]).map((i) => `${escapeHtml(i.producto)} x${i.cantidad}`).join(', ')}</p></div>
@@ -74,7 +104,7 @@ async function loadSellerOrders() {
 async function loadHistory(clienteId) {
   const target = $('#history-list');
   try {
-    const orders = await api(`/api/pedidos/historial/${encodeURIComponent(clienteId)}`);
+    const orders = await api(`/api/pedidos/historial/${encodeURIComponent(clienteId)}`, { headers: { ...authHeaders() } });
     target.innerHTML = orders.length ? orders.map((order) => `<article class="order-row">
       <div><strong>#${order.id}</strong> <span class="status">${escapeHtml(order.estado)}</span>
       <p class="meta">${(order.items || []).map((i) => `${escapeHtml(i.producto)} x${i.cantidad}`).join(', ')}</p></div>
@@ -111,13 +141,13 @@ $('#cart-list').addEventListener('input', (e) => { if (!e.target.classList.conta
 $('#cart-list').addEventListener('click', (e) => { if (e.target.classList.contains('remove-cart')) { cart.delete(e.target.dataset.product); renderCart(); } });
 $('#product-form').addEventListener('submit', async (e) => {
   e.preventDefault(); const form = e.currentTarget; const button = form.querySelector('button'); busy(button, true); feedback($('#notice'), ''); const data = Object.fromEntries(new FormData(form)); data.precio = Number(data.precio); data.stock = Number(data.stock);
-  try { await api('/api/productos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); form.reset(); feedback($('#notice'), 'Producto creado correctamente.'); await loadProducts(); } catch (error) { feedback($('#notice'), error.message, 'error'); } finally { busy(button, false); }
+  try { await api('/api/productos', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(data) }); form.reset(); feedback($('#notice'), 'Producto creado correctamente.'); await loadProducts(); } catch (error) { feedback($('#notice'), error.message, 'error'); } finally { busy(button, false); }
 });
 $('#stock-list').addEventListener('submit', async (e) => {
   if (!e.target.classList.contains('stock-row')) return;
   e.preventDefault(); const form = e.target; const button = form.querySelector('button'); busy(button, true);
   try {
-    await api(`/api/productos/${form.dataset.id}/stock`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stock: Number(new FormData(form).get('stock')) }) });
+    await api(`/api/productos/${form.dataset.id}/stock`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ stock: Number(new FormData(form).get('stock')) }) });
     feedback($('#notice'), 'Stock actualizado correctamente.'); await loadProducts();
   } catch (error) { feedback($('#notice'), error.message, 'error'); } finally { busy(button, false); }
 });
@@ -127,7 +157,7 @@ $('#stock-list').addEventListener('click', async (e) => {
   if (!window.confirm('¿Eliminar este producto del catálogo?')) return;
   busy(button, true);
   try {
-    await api(`/api/productos/${button.dataset.id}`, { method: 'DELETE' });
+    await api(`/api/productos/${button.dataset.id}`, { method: 'DELETE', headers: { ...authHeaders() } });
     feedback($('#notice'), 'Producto eliminado correctamente.');
     await loadProducts();
   } catch (error) {
@@ -156,4 +186,38 @@ $('#refresh-orders').addEventListener('click', async (e) => {
   feedback($('#notice'), loaded ? 'Pedidos actualizados correctamente.' : 'No se pudieron actualizar los pedidos.', loaded ? 'success' : 'error');
   busy(button, false);
 });
+
+$('#show-register').addEventListener('click', () => { $('#login-form').hidden = true; $('#register-form').hidden = false; });
+$('#hide-register').addEventListener('click', () => { $('#register-form').hidden = true; $('#login-form').hidden = !!session; });
+
+$('#login-form').addEventListener('submit', async (e) => {
+  e.preventDefault(); const form = e.currentTarget; const button = form.querySelector('button[type="submit"]'); busy(button, true); feedback($('#session-notice'), '');
+  const data = Object.fromEntries(new FormData(form));
+  if (!data.totp) delete data.totp;
+  try {
+    const sesion = await api('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    saveSession(sesion);
+    form.reset();
+    feedback($('#session-notice'), `Sesión iniciada como ${sesion.clienteId}.`);
+  } catch (error) { feedback($('#session-notice'), error.message, 'error'); } finally { busy(button, false); }
+});
+
+$('#register-form').addEventListener('submit', async (e) => {
+  e.preventDefault(); const form = e.currentTarget; const button = form.querySelector('button[type="submit"]'); busy(button, true); feedback($('#session-notice'), '');
+  const data = Object.fromEntries(new FormData(form));
+  data.twoFactorEnabled = form.elements.twoFactorEnabled.checked;
+  try {
+    await api('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    form.reset(); $('#register-form').hidden = true; $('#login-form').hidden = false;
+    feedback($('#session-notice'), 'Cuenta creada. Ahora podes iniciar sesión.');
+  } catch (error) { feedback($('#session-notice'), error.message, 'error'); } finally { busy(button, false); }
+});
+
+$('#logout-button').addEventListener('click', async () => {
+  try { if (session?.refreshToken) await api('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: session.refreshToken }) }); } catch { /* revocación best-effort */ }
+  saveSession(null);
+  feedback($('#session-notice'), 'Sesión cerrada.');
+});
+
+updateSessionUI();
 loadProducts();

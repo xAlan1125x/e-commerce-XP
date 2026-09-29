@@ -16,3 +16,9 @@ Feature: Consulta de Historial de Pedidos
     When el cliente "cliente_nuevo" solicita su historial de pedidos
     Then el sistema debe devolver un código HTTP 200 OK
     And la lista devuelta debe estar vacía
+
+  @security
+  Scenario: Un cliente no puede consultar el historial de otro cliente (IDOR)
+    Given que el cliente "cliente_01" ha realizado 2 pedidos previamente
+    When el cliente "cliente_02" intenta consultar el historial de "cliente_01"
+    Then el sistema debe responder con un código HTTP 403 Forbidden
