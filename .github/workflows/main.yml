@@ -9,6 +9,15 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      # Secretos exclusivos de CI (no productivos): JWT_SECRET/JWT_REFRESH_SECRET son
+      # obligatorios para firmar tokens y no tienen valor por defecto en el código.
+      JWT_SECRET: ci-only-access-secret-do-not-use-in-prod
+      JWT_REFRESH_SECRET: ci-only-refresh-secret-do-not-use-in-prod
+      ENCRYPTION_KEY: ci-only-encryption-key-do-not-use-in-prod
+      DEV_TOTP_CODE: '123456'
+      SEED_ADMIN_EMAIL: admin@estudio.local
+      SEED_ADMIN_PASSWORD: "Admin#12345"
 
     steps:
       - name: Checkout del código

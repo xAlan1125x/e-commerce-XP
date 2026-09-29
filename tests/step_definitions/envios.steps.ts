@@ -3,6 +3,7 @@ import request from 'supertest';
 import assert from 'assert';
 import { app } from '../../src/app';
 import { respuestaHTTP } from './productos.steps';
+import { obtenerTokenCliente } from '../support/authHelpers';
 
 let historialCliente: any[] = [];
 let respuestaHistorial: { status: number; body?: any } = { status: 0 };
@@ -17,12 +18,12 @@ Given('que el cliente {string} ha realizado {int} pedidos previamente', function
   }
 });
 
-When('el cliente {string} solicita su historial de pedidos', function (clienteId: string) {
-  return request(app).get(`/api/pedidos/historial/${clienteId}`).then(response => {
-    respuestaHistorial = { status: response.status, body: response.body };
-    respuestaHTTP.status = response.status;
-    respuestaHTTP.body = response.body;
-  });
+When('el cliente {string} solicita su historial de pedidos', async function (clienteId: string) {
+  const token = await obtenerTokenCliente(clienteId);
+  const response = await request(app).get(`/api/pedidos/historial/${clienteId}`).set('Authorization', `Bearer ${token}`);
+  respuestaHistorial = { status: response.status, body: response.body };
+  respuestaHTTP.status = response.status;
+  respuestaHTTP.body = response.body;
 });
 
 Then('la lista debe contener exactamente {int} pedidos pertenecientes a {string}', function (cantidadEsperada: number, clienteId: string) {
@@ -34,4 +35,16 @@ Given('que el cliente {string} no ha realizado ninguna compra', function (client
   historialCliente = [];
   const repo = require('../../src/repositories/pedidos.repository').PedidosRepository.getInstance();
   repo.eliminarPorCliente(clienteId);
+});
+
+When('el cliente {string} intenta consultar el historial de {string}', async function (clienteId: string, clienteObjetivo: string) {
+  const token = await obtenerTokenCliente(clienteId);
+  const response = await request(app).get(`/api/pedidos/historial/${clienteObjetivo}`).set('Authorization', `Bearer ${token}`);
+  respuestaHistorial = { status: response.status, body: response.body };
+  respuestaHTTP.status = response.status;
+  respuestaHTTP.body = response.body;
+});
+
+Then('el sistema debe responder con un código HTTP {int} Forbidden', function (statusCode: number) {
+  assert.strictEqual(respuestaHistorial.status, statusCode);
 });
