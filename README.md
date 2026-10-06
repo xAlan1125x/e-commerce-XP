@@ -2,6 +2,8 @@
 
 Plataforma backend de comercio electrónico implementada con TypeScript, Express y prácticas de Extreme Programming (XP). El comportamiento se especifica con Cucumber/Gherkin y puede probarse desde una interfaz web sencilla.
 
+Documentación complementaria: [SEGURIDAD.md](SEGURIDAD.md) detalla la implementación de autenticación JWT, autorización RBAC, protección anti-IDOR y hardening.
+
 ## Funcionalidades de la aplicación
 
 ### Funcionalidades disponibles desde el frontend
@@ -14,6 +16,7 @@ Desde `http://localhost:3000` se puede:
 - Como vendedor autenticado con rol `ADMIN`, crear y eliminar productos, actualizar stock, consultar todos los pedidos y ver sus estados, clientes, fechas y totales.
 - Ver mensajes de procesamiento, éxito y error que se limpian y vuelven a mostrar en cada acción.
 - Ver el stock actualizado después de cada operación.
+- Como vendedor, eliminar productos que todavía no estén asociados a pedidos y refrescar el catálogo, el inventario y los pedidos sin recargar la página.
 
 ### Funcionalidades disponibles mediante la API
 
@@ -30,6 +33,7 @@ La API REST también permite:
 - Autorización basada en roles (RBAC) sobre las rutas de administración del catálogo.
 - Límite de intentos de login por IP (rate limiting) y validación estricta de los bodies de autenticación (Zod).
 - Cifrar datos sensibles utilizando AES-256-GCM.
+- Configurar el origen permitido por CORS mediante `CORS_ORIGIN` y el límite de login mediante `LOGIN_RATE_LIMIT_MAX`.
 
 Los endpoints disponibles están detallados en la sección [API](#api).
 
@@ -168,6 +172,7 @@ El ciclo aplicado es **Red → Green → Refactor**: primero se expresa el compo
 
 ```text
 .
+├── .env.example                     # Variables de entorno para desarrollo local
 ├── .github/workflows/main.yml       # CI: instalación, lint disponible, TypeScript y Cucumber
 ├── features/                        # Especificaciones ejecutables en Gherkin
 │   ├── creacion_productos.feature  # HU01: alta y validaciones
@@ -198,11 +203,12 @@ El ciclo aplicado es **Red → Green → Refactor**: primero se expresa el compo
 │   ├── schema.prisma                 # Modelo persistente (incluye Usuario y RefreshToken)
 │   └── seed.ts                       # Crea el usuario ADMIN inicial ("npm run db:seed")
 ├── cucumber.js                       # Configuración ts-node + features
+├── SEGURIDAD.md                      # Detalle de autenticación, RBAC y hardening
 ├── package.json                      # Scripts y dependencias
 └── tsconfig.json                     # TypeScript strict
 ```
 
-Los productos y su stock se almacenan mediante Prisma en SQLite. Los pedidos mantienen su información de negocio en el repositorio de la aplicación y actualizan el stock de productos dentro de transacciones Prisma, evitando que el catálogo y el checkout utilicen fuentes de datos diferentes.
+Los productos y su stock se almacenan mediante Prisma en SQLite. Los usuarios y refresh tokens también se persisten en la base de datos. La información de los pedidos se mantiene en el repositorio de la aplicación para la demo y las pruebas BDD; por eso el historial de pedidos se reinicia al reiniciar el proceso, mientras que el stock se actualiza dentro de transacciones Prisma. Los tests limpian y preparan el estado necesario antes de cada escenario.
 
 ## API
 
@@ -215,8 +221,10 @@ Los productos y su stock se almacenan mediante Prisma en SQLite. Los pedidos man
 
 ### Catálogo y pedidos
 
+Las rutas protegidas usan el encabezado `Authorization: Bearer <accessToken>`.
+
 - `GET /api/productos?categoria=Audio` lista y filtra productos (pública).
-- `POST /api/productos` crea un producto. **Requiere `Authorization: Bearer <accessToken>` con rol `ADMIN`.**
+- `POST /api/productos` crea un producto. **Requiere `Authorization: Bearer <accessToken>`` con rol `ADMIN`.**
 - `PATCH /api/productos/:id/stock` actualiza stock. **Requiere rol `ADMIN`.**
 - `DELETE /api/productos/:id` elimina un producto que todavía no esté incluido en pedidos. **Requiere rol `ADMIN`.**
 - `POST /api/pedidos` crea un pedido (pública).
@@ -225,7 +233,7 @@ Los productos y su stock se almacenan mediante Prisma en SQLite. Los pedidos man
 - `GET /api/pedidos/historial/:clienteId` / `GET /api/clientes/:clienteId/pedidos` consultan el historial del cliente. **Requiere estar autenticado como ese mismo `clienteId`, o ser `ADMIN`.**
 - `GET /` sirve el frontend.
 
-Las rutas marcadas como protegidas devuelven `401` sin token (o token inválido/expirado) y `403` con un token válido pero sin los permisos necesarios.
+Las rutas marcadas como protegidas devuelven `401` sin token (o token inválido/expirado) y `403` con un token válido pero sin los permisos necesarios. Las rutas públicas de pedidos se mantienen así para conservar los escenarios BDD existentes; el historial y el listado global sí están protegidos.
 
 ## Cómo levantar el proyecto
 
@@ -257,6 +265,27 @@ conectado a un proceso anterior que no tenga las rutas más recientes.
 Abrir `http://localhost:3000` para usar el frontend. Desde la sección "Sesión"
 podés iniciar sesión como `ADMIN` (para crear/editar productos) o registrarte
 como cliente nuevo (para hacer pedidos y ver tu propio historial).
+
+### Variables de entorno
+
+El archivo `.env.example` contiene una configuración local de referencia:
+
+| Variable | Uso | Valor predeterminado |
+| --- | --- | --- |
+| `PORT` | Puerto HTTP de Express | `3000` |
+| `CORS_ORIGIN` | Único origen permitido por CORS | `http://localhost:3000` |
+| `JWT_SECRET` | Firma de access tokens | Obligatoria |
+| `JWT_REFRESH_SECRET` | Firma de refresh tokens | Obligatoria |
+| `ENCRYPTION_KEY` | Cifrado AES-256-GCM de datos sensibles | Obligatoria |
+| `DEV_TOTP_CODE` | Código TOTP fijo para desarrollo y pruebas | `123456` |
+| `LOGIN_RATE_LIMIT_MAX` | Intentos de login por IP cada 15 minutos | `5` |
+| `SEED_ADMIN_CLIENTE_ID` | `clienteId` del administrador inicial | `admin` |
+| `SEED_ADMIN_EMAIL` | Email del administrador inicial | `admin@estudio.local` |
+| `SEED_ADMIN_PASSWORD` | Contraseña del administrador inicial | `Admin#12345` |
+
+No uses los secretos del ejemplo fuera de un entorno local. `JWT_SECRET`,
+`JWT_REFRESH_SECRET` y `ENCRYPTION_KEY` deben ser distintos y reemplazarse por
+valores propios.
 
 ### Probar la API con cURL
 
@@ -294,4 +323,15 @@ Para ejecutar el linter:
 npm run lint
 ```
 
-El pipeline de GitHub Actions ejecuta `npm ci`, lint, compilación TypeScript y la suite Cucumber en cada push y pull request.
+### Scripts disponibles
+
+- `npm run dev`: inicia el servidor Express con `ts-node`.
+- `npm run db:push`: sincroniza el esquema Prisma con SQLite.
+- `npm run db:seed`: crea o actualiza el administrador inicial.
+- `npm run test:e2e`: ejecuta el seed y todos los escenarios Cucumber.
+- `npm run lint`: analiza el código TypeScript de `src/` y `tests/`.
+- `npx tsc --noEmit`: comprueba los tipos sin generar archivos.
+
+El pipeline de GitHub Actions ejecuta `npm ci`, lint, compilación TypeScript,
+preparación de SQLite y la suite Cucumber en cada push a `main`, `master` o
+`dev`, y en cada pull request hacia `main` o `master`.
