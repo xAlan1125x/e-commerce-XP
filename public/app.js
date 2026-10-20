@@ -5,27 +5,31 @@ const stockList = $('#stock-list');
 const cart = new Map();
 
 let session = null;
-try { session = JSON.parse(localStorage.getItem('session') || 'null'); } catch { session = null; }
+try { session = JSON.parse(sessionStorage.getItem('session') || 'null'); } catch { session = null; }
 
 function saveSession(nueva) {
   session = nueva;
-  try { nueva ? localStorage.setItem('session', JSON.stringify(nueva)) : localStorage.removeItem('session'); } catch { /* almacenamiento no disponible */ }
+  try { nueva ? sessionStorage.setItem('session', JSON.stringify(nueva)) : sessionStorage.removeItem('session'); } catch { /* almacenamiento no disponible */ }
   updateSessionUI();
 }
 
 function updateSessionUI() {
   const status = $('#session-status');
   const logoutButton = $('#logout-button');
+  const sessionManager = $('#session-manager');
   if (session) {
     status.textContent = `${session.clienteId} (${session.rol})`;
     $('#login-form').hidden = true;
     logoutButton.hidden = false;
+    sessionManager.hidden = false;
     $('#history-client').value = session.clienteId;
     $('#order-form [name="clienteId"]').value = session.clienteId;
   } else {
     status.textContent = 'Sin sesión';
     $('#login-form').hidden = false;
     logoutButton.hidden = true;
+    sessionManager.hidden = true;
+    $('#session-list').innerHTML = '';
   }
 }
 
@@ -56,6 +60,25 @@ function busy(button, value) {
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
+}
+
+async function loadSessions() {
+  if (!session?.accessToken) return;
+  try {
+    const sesiones = await api('/api/auth/sessions', { headers: { ...authHeaders() } });
+    $('#session-list').innerHTML = sesiones.length ? sesiones.map((sesion) => `
+      <article class="session-row">
+        <div>
+          <strong>${escapeHtml(sesion.deviceName)}</strong>${sesion.current ? '<span class="status">Actual</span>' : ''}
+          <p class="meta">Última actividad: ${new Date(sesion.lastUsedAt).toLocaleString()}</p>
+          <p class="meta">${escapeHtml(sesion.ipAddress || 'IP no informada')}</p>
+        </div>
+        <button class="button danger revoke-session" type="button" data-session-id="${escapeHtml(sesion.sessionId)}" data-current="${sesion.current}">Revocar</button>
+      </article>
+    `).join('') : '<p class="empty">No hay sesiones activas.</p>';
+  } catch (error) {
+    feedback($('#session-notice'), error.message, 'error');
+  }
 }
 
 function renderCart() {
@@ -199,6 +222,7 @@ $('#login-form').addEventListener('submit', async (e) => {
     saveSession(sesion);
     form.reset();
     feedback($('#session-notice'), `Sesión iniciada como ${sesion.clienteId}.`);
+    await loadSessions();
   } catch (error) { feedback($('#session-notice'), error.message, 'error'); } finally { busy(button, false); }
 });
 
@@ -219,5 +243,31 @@ $('#logout-button').addEventListener('click', async () => {
   feedback($('#session-notice'), 'Sesión cerrada.');
 });
 
+$('#refresh-sessions').addEventListener('click', loadSessions);
+
+$('#session-list').addEventListener('click', async (event) => {
+  const button = event.target.closest('.revoke-session');
+  if (!button) return;
+  busy(button, true);
+  try {
+    await api(`/api/auth/sessions/${encodeURIComponent(button.dataset.sessionId)}`, {
+      method: 'DELETE',
+      headers: { ...authHeaders() }
+    });
+    if (button.dataset.current === 'true') {
+      saveSession(null);
+      feedback($('#session-notice'), 'La sesión actual fue revocada.');
+    } else {
+      feedback($('#session-notice'), 'Sesión revocada correctamente.');
+      await loadSessions();
+    }
+  } catch (error) {
+    feedback($('#session-notice'), error.message, 'error');
+  } finally {
+    busy(button, false);
+  }
+});
+
 updateSessionUI();
+if (session) loadSessions();
 loadProducts();

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken, AccessTokenPayload, Rol } from './jwt';
+import { isSessionActive } from './auth.service';
 
 declare global {
   namespace Express {
@@ -10,7 +11,7 @@ declare global {
 }
 
 /** AuthN: valida la firma y vigencia del access token (JWT). */
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
   if (!token) {
@@ -18,6 +19,9 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
   try {
     req.usuario = verifyAccessToken(token);
+    if (!await isSessionActive(req.usuario.sub, req.usuario.sessionId)) {
+      return res.status(403).json({ error: 'La sesión fue revocada o expiró.' });
+    }
     return next();
   } catch {
     return res.status(403).json({ error: 'Token inválido o expirado.' });

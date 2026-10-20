@@ -27,6 +27,7 @@
           <label>Email<input name="email" type="email" required></label>
           <label>Contraseña<input name="password" type="password" required></label>
           <label>Código 2FA<input name="totp" maxlength="6" placeholder="123456 en desarrollo"></label>
+          <label>Dispositivo<input name="deviceName" maxlength="80" placeholder="Ej. Notebook personal"></label>
           <button class="button" type="submit">Iniciar sesión</button>
           <button id="show-register" class="button secondary" type="button">Crear cuenta</button>
           <button id="logout-button" class="button secondary" type="button" hidden>Cerrar sesión</button>
@@ -40,6 +41,13 @@
           <button id="hide-register" class="button secondary" type="button">Cancelar</button>
         </form>
         <div id="session-notice" class="notice" role="status"></div>
+        <section id="session-manager" class="session-manager" hidden>
+          <div class="section-heading compact">
+            <div><p class="eyebrow">HU07</p><h2>Sesiones activas</h2></div>
+            <button id="refresh-sessions" class="button secondary" type="button">Actualizar sesiones</button>
+          </div>
+          <div id="session-list" aria-live="polite"></div>
+        </section>
       </section>
 
       <nav class="tabs" aria-label="Tipo de usuario">

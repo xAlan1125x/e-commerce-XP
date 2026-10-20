@@ -53,6 +53,9 @@ jobs:
       - name: Compilación de TypeScript
         run: npx tsc --noEmit
 
+      - name: Construir imagen Docker
+        run: docker build -t ecommerce-xp:ci .
+
       - name: Preparar base de datos de pruebas
         run: npm run db:deploy
 

@@ -8,7 +8,14 @@ import YAML from 'yaml';
 import { crearPedidoHandler, cancelarPedidoHandler, listarPedidosHandler } from './controllers/pedidos.controller';
 import { crearProductoHandler, listarProductosHandler, actualizarStockHandler, eliminarProductoHandler } from './controllers/productos.controller';
 import { historialPedidosHandler } from './controllers/pedidos.controller';
-import { loginHandler, logoutHandler, refreshHandler, registerHandler } from './controllers/auth.controller';
+import {
+  listSessionsHandler,
+  loginHandler,
+  logoutHandler,
+  refreshHandler,
+  registerHandler,
+  revokeSessionHandler
+} from './controllers/auth.controller';
 import { requireAuth, requireOwnership, requireRole } from './security/authMiddleware';
 import { loginLimiter } from './security/rateLimiters';
 import { crearPedidoSchema, loginSchema, refreshSchema, registroSchema, validate } from './security/validation';
@@ -31,6 +38,8 @@ app.post('/api/auth/register', validate(registroSchema), registerHandler);
 app.post('/api/auth/login', loginLimiter, validate(loginSchema), loginHandler);
 app.post('/api/auth/refresh', validate(refreshSchema), refreshHandler);
 app.post('/api/auth/logout', validate(refreshSchema), logoutHandler);
+app.get('/api/auth/sessions', requireAuth, listSessionsHandler);
+app.delete('/api/auth/sessions/:sessionId', requireAuth, revokeSessionHandler);
 
 // --- Catálogo (lectura pública, escritura solo ADMIN) ---
 app.get('/api/productos', listarProductosHandler);

@@ -10,6 +10,7 @@ export interface AccessTokenPayload {
   sub: number;
   clienteId: string;
   rol: Rol;
+  sessionId: string;
 }
 
 function getSecret(name: 'JWT_SECRET' | 'JWT_REFRESH_SECRET'): string {
@@ -26,12 +27,12 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
   return jwt.verify(token, getSecret('JWT_SECRET')) as unknown as AccessTokenPayload;
 }
 
-export function signRefreshToken(payload: { sub: number }): { token: string; expiresAt: Date } {
+export function signRefreshToken(payload: { sub: number; sessionId: string }): { token: string; expiresAt: Date } {
   const token = jwt.sign(payload, getSecret('JWT_REFRESH_SECRET'), { expiresIn: REFRESH_TOKEN_TTL });
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
   return { token, expiresAt };
 }
 
-export function verifyRefreshToken(token: string): { sub: number } {
-  return jwt.verify(token, getSecret('JWT_REFRESH_SECRET')) as unknown as { sub: number };
+export function verifyRefreshToken(token: string): { sub: number; sessionId: string } {
+  return jwt.verify(token, getSecret('JWT_REFRESH_SECRET')) as unknown as { sub: number; sessionId: string };
 }

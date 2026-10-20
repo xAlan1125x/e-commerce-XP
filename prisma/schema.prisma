@@ -59,13 +59,19 @@ model Usuario {
 }
 
 model RefreshToken {
-  id        Int       @id @default(autoincrement())
-  tokenHash String    @unique
-  usuarioId Int
-  usuario   Usuario   @relation(fields: [usuarioId], references: [id])
-  expiresAt DateTime
-  revokedAt DateTime?
-  createdAt DateTime  @default(now())
+  id         Int       @id @default(autoincrement())
+  sessionId  String    @unique @default(uuid())
+  tokenHash  String    @unique
+  usuarioId  Int
+  usuario    Usuario   @relation(fields: [usuarioId], references: [id])
+  deviceName String    @default("Dispositivo desconocido")
+  userAgent  String?
+  ipAddress  String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastUsedAt DateTime  @default(now())
+  createdAt  DateTime  @default(now())
 
+  @@index([usuarioId, revokedAt, expiresAt])
   @@map("refresh_tokens")
 }

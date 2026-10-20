@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+.git
+.env
+prisma/*.db
+prisma/*.db-journal
+Screenshots
+*.log

@@ -30,6 +30,7 @@ La API REST también permite:
 - Registrar usuarios con contraseñas protegidas mediante bcrypt (el rol siempre nace `CLIENTE`).
 - Iniciar sesión con contraseña y segundo factor TOTP de seis dígitos, recibiendo un access token JWT y un refresh token.
 - Renovar el access token (`/api/auth/refresh`) y revocarlo (`/api/auth/logout`).
+- Listar las sesiones activas con su dispositivo, IP y última actividad, y revocar una sesión propia desde la API o el frontend.
 - Autorización basada en roles (RBAC) sobre las rutas de administración del catálogo.
 - Límite de intentos de login por IP (rate limiting) y validación estricta de los bodies de autenticación (Zod).
 - Cifrar datos sensibles utilizando AES-256-GCM.
@@ -103,6 +104,23 @@ Criterios de aceptación:
 - Cada pedido muestra fecha, productos, cantidades, precio unitario y total calculado.
 - Si el cliente no tiene pedidos, el sistema devuelve `[]` con HTTP `200 OK`.
 
+#### HU07 - Gestión de sesiones activas
+
+Como usuario autenticado, quiero ver y revocar mis sesiones activas para
+controlar desde qué dispositivos accedo.
+
+Criterios de aceptación:
+
+- Cada login crea una sesión persistente con un `sessionId` público, dispositivo,
+  IP, agente de usuario, expiración y última actividad.
+- `GET /api/auth/sessions` devuelve solo las sesiones activas del usuario autenticado.
+- `DELETE /api/auth/sessions/:sessionId` permite revocar una sesión propia con
+  `204`, pero responde `403` si pertenece a otro usuario.
+- Una sesión revocada invalida inmediatamente tanto el refresh token como el uso
+  posterior de su access token en rutas protegidas.
+- Varios inicios de sesión simultáneos se almacenan sin perder registros ni
+  repetir identificadores.
+
 ### Requisitos no funcionales y técnicos
 
 #### RNF01 - Autenticación robusta con JWT y segundo factor
@@ -162,6 +180,20 @@ Criterios de aceptación:
 - Los comportamientos se verifican mediante escenarios Cucumber/Gherkin.
 - GitHub Actions ejecuta instalación, lint, compilación TypeScript y pruebas BDD en cada push y pull request.
 
+#### RNF06 simplificado - Persistencia y concurrencia de sesiones
+
+Para HU07 se eligió una solución mínima y suficiente para esta entrega:
+
+- PostgreSQL y Prisma reemplazan al Redis sugerido en el PRD. Las sesiones son
+  estado compartido y sobreviven a reinicios o múltiples instancias de la API.
+- Node.js/Express usa I/O asíncrono y Prisma administra un pool de conexiones;
+  PostgreSQL puede procesar en paralelo los inserts de logins concurrentes.
+- El escenario `@concurrency` dispara seis logins simultáneos con `Promise.all`
+  y verifica ocho sesiones activas contando las dos del Background.
+- No se usa BullMQ porque HU07 no necesita trabajos diferidos; queda reservado
+  para una futura HU09. Tampoco se requiere Redis ni Playwright para demostrar
+  listado, autorización, persistencia y concurrencia de esta historia.
+
 ## Fases BDD y XP
 
 1. **Fase 1 - Requisitos:** historias y criterios de aceptación.
@@ -182,7 +214,8 @@ El ciclo aplicado es **Red → Green → Refactor**: primero se expresa el compo
 │   ├── actualizacion_stock.feature  # HU03: inventario
 │   ├── creacion_pedidos.feature     # HU04: checkout y stock
 │   ├── cancelacion_pedido.feature   # HU05: cancelación y reintegro
-│   └── historial_pedidos.feature    # HU06: historial por cliente
+│   ├── historial_pedidos.feature    # HU06: historial por cliente
+│   └── gestion_sesiones.feature     # HU07: listado, revocación y concurrencia
 ├── public/                          # Frontend estático servido por Express
 │   ├── index.html                   # Pantalla de catálogo, alta y checkout
 │   ├── app.js                       # Cliente HTTP de la API
@@ -205,7 +238,8 @@ El ciclo aplicado es **Red → Green → Refactor**: primero se expresa el compo
 │   ├── migrations/                   # Migraciones versionadas de PostgreSQL
 │   ├── schema.prisma                 # Entidades y relaciones administradas por Prisma
 │   └── seed.ts                       # Crea el usuario ADMIN inicial ("npm run db:seed")
-├── compose.yaml                      # PostgreSQL local en el puerto 5433
+├── compose.yaml                      # API y PostgreSQL orquestados con Docker
+├── Dockerfile                        # Imagen de la aplicación Node/Express
 ├── openapi.yaml                      # Contrato OpenAPI mostrado por Swagger UI
 ├── cucumber.js                       # Configuración ts-node + features
 ├── SEGURIDAD.md                      # Detalle de autenticación, RBAC y hardening
@@ -301,16 +335,23 @@ al stock responde `409 Conflict` y provoca el rollback:
 ### Autenticación (públicas, sujetas a validación Zod)
 
 - `POST /api/auth/register` registra un usuario (`clienteId`, `email`, `password`, `twoFactorEnabled?`). El rol siempre nace `CLIENTE`.
-- `POST /api/auth/login` exige `email` + `password` y, si está activado, `totp` de seis dígitos. Devuelve `accessToken` (JWT, 15 min) y `refreshToken` (7 días). Limitado a 5 intentos / 15 min por IP.
+- `POST /api/auth/login` exige `email` + `password` y acepta `deviceName` y, si está activado, `totp`. Devuelve `accessToken`, `refreshToken` y `sessionId`. Limitado a 5 intentos / 15 min por IP.
 - `POST /api/auth/refresh` recibe `refreshToken` y devuelve un nuevo `accessToken`.
 - `POST /api/auth/logout` recibe `refreshToken` y lo revoca.
+
+### HU07 - Sesiones (protegidas con Bearer JWT)
+
+- `GET /api/auth/sessions` lista las sesiones activas propias.
+- `DELETE /api/auth/sessions/:sessionId` revoca una sesión propia.
+- Los endpoints nunca exponen el hash ni el refresh token persistido.
+- Intentar revocar una sesión ajena responde `403`; una inexistente responde `404`.
 
 ### Catálogo y pedidos
 
 Las rutas protegidas usan el encabezado `Authorization: Bearer <accessToken>`.
 
 - `GET /api/productos?categoria=Audio` lista y filtra productos (pública).
-- `POST /api/productos` crea un producto. **Requiere `Authorization: Bearer <accessToken>`` con rol `ADMIN`.**
+- `POST /api/productos` crea un producto. **Requiere `Authorization: Bearer <accessToken>` con rol `ADMIN`.**
 - `PATCH /api/productos/:id/stock` actualiza stock. **Requiere rol `ADMIN`.**
 - `DELETE /api/productos/:id` elimina un producto que todavía no esté incluido en pedidos. **Requiere rol `ADMIN`.**
 - `POST /api/pedidos` crea un pedido (pública).
@@ -346,6 +387,24 @@ Los comandos cumplen las siguientes funciones:
 - `npm run db:seed` crea o actualiza el usuario administrador inicial.
 - `npm run dev` inicia Express en el puerto `3000`.
 
+### Levantar todo en contenedores
+
+La alternativa más corta para la demostración es contenerizar tanto la API como
+PostgreSQL:
+
+```bash
+copy .env.example .env
+npm run docker:up
+```
+
+En Linux/macOS usar `cp`. Docker Compose construye la imagen, espera que
+PostgreSQL esté saludable, aplica las migraciones, ejecuta el seed y publica el
+frontend/API en `http://localhost:3000`. Para detener el entorno:
+
+```bash
+npm run docker:down
+```
+
 Edita `.env` con secretos locales propios (`JWT_SECRET`, `JWT_REFRESH_SECRET`,
 `ENCRYPTION_KEY`, etc.). En PowerShell también puedes usar
 `$env:ENCRYPTION_KEY = "una-clave-local-segura"` antes de arrancar. Los valores
@@ -363,7 +422,8 @@ conectado a un proceso anterior que no tenga las rutas más recientes.
 
 Abrir `http://localhost:3000` para usar el frontend. Desde la sección "Sesión"
 podés iniciar sesión como `ADMIN` (para crear/editar productos) o registrarte
-como cliente nuevo (para hacer pedidos y ver tu propio historial).
+como cliente nuevo. Al iniciar sesión se habilita el panel **Sesiones activas**,
+desde el que se actualiza la lista y se revoca cualquier sesión propia.
 
 Abrir `http://localhost:3000/api-docs` para consultar y probar el contrato de
 la API desde Swagger UI.
@@ -396,6 +456,19 @@ El resultado esperado es `201 Created`, con el pedido persistido, `total: 4500`
 y el stock restante. Para comprobar validaciones, cambiar `cantidad` a `0`
 (`422`) o a `99999` (`409`). Finalmente, ejecutar `npx prisma studio` y abrir
 `Pedido` y `DetallePedido` para verificar que los datos fueron almacenados.
+
+Para demostrar HU07 desde el frontend:
+
+1. Registrar un cliente o iniciar sesión como `admin@estudio.local` / `Admin#12345`.
+2. Escribir un nombre como `Notebook personal` en el campo **Dispositivo**.
+3. Abrir una ventana privada, iniciar otra sesión como el mismo usuario con el
+   nombre `Teléfono` y volver a la primera ventana.
+4. Presionar **Actualizar sesiones**: deben aparecer ambos dispositivos.
+5. Revocar `Teléfono`; su refresh token y su JWT dejan de autorizar.
+
+La misma prueba puede hacerse desde Swagger en `http://localhost:3000/api-docs`:
+ejecutar el login, copiar `accessToken`, presionar **Authorize**, listar sesiones
+y finalmente ejecutar `DELETE /api/auth/sessions/{sessionId}`.
 
 ### Variables de entorno
 
@@ -457,7 +530,7 @@ npm run lint
 
 ## Cobertura de pruebas
 
-La suite BDD se ejecutó con 14 escenarios y 59 pasos, todos aprobados. La
+La suite BDD se ejecutó con 18 escenarios y 76 pasos, todos aprobados. La
 cobertura se midió sobre `src/**/*.ts`, excluyendo únicamente
 `src/app.ts`, con `c8`:
 
@@ -483,14 +556,18 @@ El repositorio de pedidos alcanza un **98,44 % de cobertura de líneas**,
 ### Scripts disponibles
 
 - `npm run dev`: inicia el servidor Express con `ts-node`.
+- `npm start`: inicia la aplicación dentro del contenedor.
 - `npm run db:start`: levanta PostgreSQL local mediante Docker Compose.
 - `npm run db:migrate`: crea y aplica migraciones durante el desarrollo.
 - `npm run db:deploy`: aplica las migraciones pendientes.
 - `npm run db:seed`: crea o actualiza el administrador inicial.
+- `npm run docker:up`: construye y levanta API + PostgreSQL.
+- `npm run docker:down`: detiene el entorno contenerizado.
 - `npm run test:e2e`: ejecuta el seed y todos los escenarios Cucumber.
 - `npm run lint`: analiza el código TypeScript de `src/` y `tests/`.
 - `npx tsc --noEmit`: comprueba los tipos sin generar archivos.
 
 El pipeline de GitHub Actions levanta PostgreSQL, ejecuta `npm ci`, lint,
-compilación TypeScript, migraciones y la suite Cucumber en cada push a `main`,
-`master` o `dev`, y en cada pull request hacia `main` o `master`.
+compilación TypeScript, construcción de la imagen Docker, migraciones y la suite
+Cucumber en cada push a `main`, `master` o `dev`, y en cada pull request hacia
+`main` o `master`.
