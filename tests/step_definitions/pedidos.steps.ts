@@ -3,6 +3,7 @@ import request from 'supertest';
 import assert from 'assert';
 import { app } from '../../src/app';
 import { PedidosRepository } from '../../src/repositories/pedidos.repository';
+import { obtenerTokenCliente } from '../support/authHelpers';
 
 const repo = PedidosRepository.getInstance();
 
@@ -12,16 +13,34 @@ Given('que el producto {string} tiene un stock disponible de {int} unidades', as
 });
 
 When('el cliente {string} realiza un pedido de {int} unidades de {string}', async function (clienteId: string, cantidad: number, nombreProducto: string) {
+  await obtenerTokenCliente(clienteId);
   this.response = await request(app)
     .post('/api/pedidos')
     .send({ clienteId, cantidad, producto: nombreProducto });
 });
 
 When('el cliente {string} intenta realizar un pedido de {int} unidades de {string}', async function (clienteId: string, cantidad: number, nombreProducto: string) {
+  await obtenerTokenCliente(clienteId);
   this.response = await request(app)
     .post('/api/pedidos')
     .send({ clienteId, cantidad, producto: nombreProducto });
 });
+
+When(
+  'el cliente {string} intenta comprar {int} unidad de {string} y {int} unidades de {string}',
+  async function (clienteId: string, cantidadPrimera: number, primerProducto: string, cantidadSegunda: number, segundoProducto: string) {
+    await obtenerTokenCliente(clienteId);
+    this.response = await request(app)
+      .post('/api/pedidos')
+      .send({
+        clienteId,
+        items: [
+          { producto: primerProducto, cantidad: cantidadPrimera },
+          { producto: segundoProducto, cantidad: cantidadSegunda }
+        ]
+      });
+  }
+);
 
 Then('el pedido debe registrarse con estado {string}', function (estadoEsperado: string) {
   assert.strictEqual(this.response?.body?.estado, estadoEsperado);
@@ -39,20 +58,16 @@ Then('la creación del pedido debe ser rechazada por falta de stock', function (
   assert.strictEqual(this.response?.status >= 400, true);
 });
 
-Then('el stock de {string} debe permanecer intacto en {int} unidades', function (nombreProducto: string, stockEsperado: number) {
+Then('el stock de {string} debe permanecer intacto en {int} unidades', async function (nombreProducto: string, stockEsperado: number) {
   assert.strictEqual(this.response?.status >= 400, true);
+  assert.strictEqual(await repo.obtenerStock(nombreProducto), stockEsperado);
 });
 
 // HU05 - Cancelación de Pedidos
 Given('que el cliente {string} tiene un pedido registrado con ID {int} en estado {string} que incluye {int} unidades de {string}', async function (cliente: string, id: number, estado: string, cantidad: number, producto: string) {
+  await obtenerTokenCliente(cliente);
   await repo.actualizarStock(producto, 10);
-  const repoAny = repo as any;
-  const pedidoExistente = repoAny.pedidos?.find((p: any) => p.id === id);
-  if (pedidoExistente) {
-    pedidoExistente.producto = producto;
-    pedidoExistente.cantidad = cantidad;
-    pedidoExistente.estado = estado;
-  }
+  await repo.guardarPedidoParaPrueba(id, cliente, estado, producto, cantidad);
 });
 
 Given('el stock actual de {string} es de {int} unidades', async function (producto: string, stock: number) {
@@ -73,8 +88,9 @@ Then('el stock de {string} debe reintegrarse a {int} unidades', function (produc
   assert.strictEqual(this.response?.body?.stockRestante, stockEsperado);
 });
 
-Given('que el pedido con ID {int} se encuentra en estado {string}', function (id: number, estado: string) {
-  // Pre-configuración
+Given('que el pedido con ID {int} se encuentra en estado {string}', async function (id: number, estado: string) {
+  await obtenerTokenCliente('cliente_02');
+  await repo.guardarPedidoParaPrueba(id, 'cliente_02', estado, 'Procesador Intel', 1);
 });
 
 When('el cliente intenta cancelar el pedido con ID {int}', async function (id: number) {

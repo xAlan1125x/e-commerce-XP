@@ -1,0 +1,130 @@
+openapi: 3.1.0
+info:
+  title: E-Commerce XP API
+  version: 1.0.0
+  description: API para gestionar el catálogo y procesar pedidos de forma transaccional.
+servers:
+  - url: http://localhost:3000
+    description: Entorno local
+tags:
+  - name: Pedidos
+    description: Checkout y gestión de pedidos
+paths:
+  /api/pedidos:
+    post:
+      tags: [Pedidos]
+      summary: Procesar un pedido
+      description: Crea el pedido, descuenta el stock y registra sus detalles en una única transacción.
+      operationId: crearPedido
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearPedidoDto'
+            examples:
+              variosProductos:
+                summary: Pedido con varios productos
+                value:
+                  clienteId: cliente_01
+                  items:
+                    - producto: Placa de Video
+                      cantidad: 2
+                    - producto: Teclado Mecánico
+                      cantidad: 1
+      responses:
+        '201':
+          description: Pedido creado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pedido'
+        '400':
+          description: El cliente indicado no está registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Algún producto no existe o no tiene stock suficiente; la operación completa se revierte
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: El cuerpo de la petición es inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    CrearPedidoDto:
+      type: object
+      required: [clienteId, items]
+      properties:
+        clienteId:
+          type: string
+          minLength: 1
+          example: cliente_01
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CrearPedidoItemDto'
+    CrearPedidoItemDto:
+      type: object
+      required: [producto, cantidad]
+      properties:
+        producto:
+          type: string
+          minLength: 1
+          example: Placa de Video
+        cantidad:
+          type: integer
+          minimum: 1
+          example: 2
+    Pedido:
+      type: object
+      required: [id, clienteId, estado, items, total, createdAt]
+      properties:
+        id:
+          type: integer
+          example: 1
+        clienteId:
+          type: string
+          example: cliente_01
+        estado:
+          type: string
+          example: Pendiente de Envío
+        stockRestante:
+          type: integer
+          example: 3
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PedidoItem'
+        total:
+          type: number
+          format: double
+          example: 250000
+        createdAt:
+          type: string
+          format: date-time
+    PedidoItem:
+      type: object
+      required: [producto, cantidad, precioUnitario]
+      properties:
+        producto:
+          type: string
+        cantidad:
+          type: integer
+        precioUnitario:
+          type: number
+          format: double
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

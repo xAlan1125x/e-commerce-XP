@@ -9,6 +9,20 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ecommerce_xp_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ecommerce_xp_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       # Secretos exclusivos de CI (no productivos): JWT_SECRET/JWT_REFRESH_SECRET son
       # obligatorios para firmar tokens y no tienen valor por defecto en el código.
@@ -18,6 +32,7 @@ jobs:
       DEV_TOTP_CODE: '123456'
       SEED_ADMIN_EMAIL: admin@estudio.local
       SEED_ADMIN_PASSWORD: "Admin#12345"
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ecommerce_xp_test?schema=public
 
     steps:
       - name: Checkout del código
@@ -39,7 +54,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Preparar base de datos de pruebas
-        run: npx prisma db push --skip-generate
+        run: npm run db:deploy
 
       - name: Ejecución de Pruebas BDD (Cucumber)
         run: npm run test:e2e

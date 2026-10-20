@@ -1,8 +1,28 @@
-import { PrismaClient, Producto } from '@prisma/client';
+import { Prisma, PrismaClient, Producto } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export class ProductosRepository {
+  /** Limpia datos relacionados únicamente para preparar escenarios BDD repetibles. */
+  private async eliminarParaPrueba(where: Prisma.ProductoWhereInput): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      const productos = await tx.producto.findMany({ where, select: { id: true } });
+      const productoIds = productos.map((producto) => producto.id);
+      if (!productoIds.length) return;
+
+      const detalles = await tx.detallePedido.findMany({
+        where: { productoId: { in: productoIds } },
+        select: { pedidoId: true }
+      });
+      const pedidoIds = [...new Set(detalles.map((detalle) => detalle.pedidoId))];
+      if (pedidoIds.length) {
+        // Al borrar el pedido, sus detalles se eliminan por la relación onDelete: Cascade.
+        await tx.pedido.deleteMany({ where: { id: { in: pedidoIds } } });
+      }
+      await tx.producto.deleteMany({ where: { id: { in: productoIds } } });
+    });
+  }
+
   async crear(datos: Omit<Producto, 'id' | 'createdAt'>): Promise<Producto> {
     return prisma.producto.create({ data: datos });
   }
@@ -28,12 +48,12 @@ export class ProductosRepository {
   }
 
   async eliminarPorNombre(nombre: string): Promise<void> {
-    await prisma.producto.deleteMany({ where: { nombre } });
+    await this.eliminarParaPrueba({ nombre });
   }
 
   /** Used by acceptance tests to establish a deterministic product identifier. */
   async guardarConId(id: number, datos: Omit<Producto, 'id' | 'createdAt'>): Promise<Producto> {
-    await prisma.producto.deleteMany({ where: { id } });
+    await this.eliminarParaPrueba({ OR: [{ id }, { nombre: datos.nombre }] });
     return prisma.producto.create({ data: { id, ...datos } });
   }
 }

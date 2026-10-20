@@ -1,32 +1,33 @@
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
 }
 
-
 model Producto {
-  id          Int            @id @default(autoincrement())
-  nombre      String         @unique
-  precio      Float
-  stock       Int
-  categoria   String
-  detalles    DetallePedido[]
-  createdAt   DateTime       @default(now())
+  id        Int             @id @default(autoincrement())
+  nombre    String          @unique
+  precio    Float
+  stock     Int
+  categoria String
+  detalles  DetallePedido[]
+  createdAt DateTime        @default(now())
 
   @@map("productos")
 }
 
 model Pedido {
-  id          Int            @id @default(autoincrement())
-  clienteId   String
-  estado      String         @default("Pendiente de Envío") // "Pendiente de Envío", "En camino", "Entregado", "Cancelado"
+  id          Int             @id @default(autoincrement())
+  usuarioId   Int
+  usuario     Usuario         @relation(fields: [usuarioId], references: [id])
+  estado      String          @default("Pendiente de Envío")
   codigoEnvio String?
+  total       Float           @default(0)
   detalles    DetallePedido[]
-  createdAt   DateTime       @default(now())
+  createdAt   DateTime        @default(now())
 
   @@map("pedidos")
 }
@@ -37,21 +38,22 @@ model DetallePedido {
   productoId Int
   cantidad   Int
   precioUnit Float
-  pedido     Pedido   @relation(fields: [pedidoId], references: [id])
+  pedido     Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
   producto   Producto @relation(fields: [productoId], references: [id])
 
   @@map("detalles_pedido")
 }
 
 model Usuario {
-  id                Int            @id @default(autoincrement())
-  clienteId         String         @unique
-  email             String         @unique
-  password          String
-  rol               String         @default("CLIENTE") // "CLIENTE" | "ADMIN"
-  twoFactorEnabled  Boolean        @default(true)
-  refreshTokens     RefreshToken[]
-  createdAt         DateTime       @default(now())
+  id               Int            @id @default(autoincrement())
+  clienteId        String         @unique
+  email            String         @unique
+  password         String
+  rol              String         @default("CLIENTE") // "CLIENTE" | "ADMIN"
+  twoFactorEnabled Boolean        @default(true)
+  refreshTokens    RefreshToken[]
+  pedidos          Pedido[]
+  createdAt        DateTime       @default(now())
 
   @@map("usuarios")
 }

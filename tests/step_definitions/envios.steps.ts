@@ -9,12 +9,13 @@ let historialCliente: any[] = [];
 let respuestaHistorial: { status: number; body?: any } = { status: 0 };
 
 // HU06 - Historial de Pedidos
-Given('que el cliente {string} ha realizado {int} pedidos previamente', function (clienteId: string, cantidadPedidos: number) {
+Given('que el cliente {string} ha realizado {int} pedidos previamente', async function (clienteId: string, cantidadPedidos: number) {
   historialCliente = [];
   const repo = require('../../src/repositories/pedidos.repository').PedidosRepository.getInstance();
-  repo.eliminarPorCliente(clienteId);
+  await obtenerTokenCliente(clienteId);
+  await repo.eliminarPorCliente(clienteId);
   for (let i = 0; i < cantidadPedidos; i++) {
-    historialCliente.push(repo.agregarPedidoParaPrueba(clienteId));
+    historialCliente.push(await repo.agregarPedidoParaPrueba(clienteId));
   }
 });
 
@@ -31,10 +32,11 @@ Then('la lista debe contener exactamente {int} pedidos pertenecientes a {string}
   assert.strictEqual(respuestaHistorial.body.every((p: any) => p.clienteId === clienteId), true);
 });
 
-Given('que el cliente {string} no ha realizado ninguna compra', function (clienteId: string) {
+Given('que el cliente {string} no ha realizado ninguna compra', async function (clienteId: string) {
   historialCliente = [];
   const repo = require('../../src/repositories/pedidos.repository').PedidosRepository.getInstance();
-  repo.eliminarPorCliente(clienteId);
+  await obtenerTokenCliente(clienteId);
+  await repo.eliminarPorCliente(clienteId);
 });
 
 When('el cliente {string} intenta consultar el historial de {string}', async function (clienteId: string, clienteObjetivo: string) {
