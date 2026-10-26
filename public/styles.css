@@ -54,5 +54,9 @@ input:focus, select:focus { outline: 3px solid #6284d833; border-color: #6284d8;
 .stock-row { display: grid; grid-template-columns: 1fr 78px auto; align-items: center; gap: 8px; padding: 8px 0; }
 .stock-row input { padding: 8px; }
 .stock-row .button { padding: 8px 10px; font-size: .8rem; }
+.session-manager { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e1e7f0; }
+.section-heading.compact { align-items: center; margin-bottom: 10px; }
+.session-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid #e8edf4; }
+.session-row:last-child { border-bottom: 0; }
 .empty { padding: 22px; color: #69758a; text-align: center; }
 @media (max-width: 760px) { .layout, .buyer-grid, .seller-grid { grid-template-columns: 1fr; } .hero { padding-top: 38px; } }

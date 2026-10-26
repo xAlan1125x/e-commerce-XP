@@ -9,7 +9,7 @@ pedidos, BDD).
 ## Contexto del proyecto
 
 **E-Commerce XP** es un backend de comercio electrónico en TypeScript + Express
-+ Prisma (SQLite), desarrollado con prácticas de Extreme Programming (XP) y
++ Prisma (PostgreSQL), desarrollado con prácticas de Extreme Programming (XP) y
 BDD (Cucumber/Gherkin). Antes de este trabajo, el proyecto ya tenía:
 
 - Catálogo de productos y pedidos con reglas de negocio (stock, cancelación,
@@ -43,6 +43,13 @@ A partir de dos documentos del profesor:
   y [src/security/auth.service.ts](src/security/auth.service.ts).
 - `POST /api/auth/refresh` renueva el access token sin pedir contraseña de nuevo.
 - `POST /api/auth/logout` revoca el refresh token.
+- Cada login crea una sesión persistente identificada por `sessionId`, con
+  dispositivo, IP, agente de usuario, expiración y última actividad.
+- `GET /api/auth/sessions` lista únicamente las sesiones activas propias y
+  `DELETE /api/auth/sessions/:sessionId` permite revocarlas.
+- `requireAuth` comprueba tanto la firma JWT como el estado persistido de la
+  sesión, por lo que una revocación invalida inmediatamente el acceso a rutas
+  protegidas. Una sesión ajena no puede revocarse (`403`, protección anti-IDOR).
 - El rol de un usuario **siempre nace `CLIENTE`** en el registro público; el
   rol `ADMIN` solo se asigna mediante el seed inicial o por un `ADMIN` ya
   autenticado (nunca confiando en el body de la request, para evitar
@@ -52,7 +59,7 @@ A partir de dos documentos del profesor:
 
 Middlewares en [src/security/authMiddleware.ts](src/security/authMiddleware.ts):
 
-- `requireAuth` — valida la firma y vigencia del JWT.
+- `requireAuth` — valida la firma y vigencia del JWT y que la sesión siga activa.
 - `requireRole(['ADMIN'])` — exige un rol específico.
 - `requireOwnership('clienteId')` — exige que el `clienteId` del token
   coincida con el de la URL (o que el usuario sea `ADMIN`).
@@ -66,6 +73,8 @@ Aplicado a rutas reales del negocio (ver [src/app.ts](src/app.ts)):
 | `DELETE /api/productos/:id` (eliminar producto) | `ADMIN` |
 | `GET /api/pedidos` (listar todos los pedidos) | `ADMIN` |
 | `GET /api/pedidos/historial/:clienteId` | Dueño del `clienteId`, o `ADMIN` (anti-IDOR) |
+| `GET /api/auth/sessions` | Usuario autenticado; solo devuelve recursos propios |
+| `DELETE /api/auth/sessions/:sessionId` | Dueño de la sesión (anti-IDOR) |
 | `GET /api/productos`, `POST /api/pedidos`, `PATCH /api/pedidos/:id/cancelar` | Públicas (sin cambios) |
 
 ### Hardening
@@ -98,7 +107,8 @@ Aplicado a rutas reales del negocio (ver [src/app.ts](src/app.ts)):
 ```bash
 npm install
 copy .env.example .env
-npx prisma db push
+npm run db:start
+npm run db:deploy
 npm run db:seed
 ```
 

@@ -1,4 +1,27 @@
 services:
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ecommerce_xp?schema=public
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-local-compose-encryption-key}
+      JWT_SECRET: ${JWT_SECRET:-local-compose-access-secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-compose-refresh-secret}
+      DEV_TOTP_CODE: ${DEV_TOTP_CODE:-123456}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      SEED_ADMIN_CLIENTE_ID: ${SEED_ADMIN_CLIENTE_ID:-admin}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@estudio.local}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-Admin#12345}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/productos').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
   postgres:
     image: postgres:16-alpine
     environment:

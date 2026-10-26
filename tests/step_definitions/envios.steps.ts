@@ -48,5 +48,5 @@ When('el cliente {string} intenta consultar el historial de {string}', async fun
 });
 
 Then('el sistema debe responder con un código HTTP {int} Forbidden', function (statusCode: number) {
-  assert.strictEqual(respuestaHistorial.status, statusCode);
+  assert.strictEqual(this.response?.status ?? respuestaHistorial.status, statusCode);
 });
